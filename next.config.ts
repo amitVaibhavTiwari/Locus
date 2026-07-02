@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
-  typedRoutes: true,
   serverExternalPackages: ["kysely", "pg", "better-sqlite3"],
 };
 
