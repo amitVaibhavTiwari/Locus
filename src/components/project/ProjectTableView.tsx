@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React from "react";
 import { Task } from "@/components/kanban/KanbanBoard";
 import {
@@ -22,19 +22,20 @@ import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 import { format } from "date-fns";
 import { SubGroupBy, groupTasks, subGroupLabels } from "@/lib/subGroup";
 
+const DEFAULT_STATUSES = [
+  { key: "todo", name: "To Do" },
+  { key: "in-progress", name: "In Progress" },
+  { key: "qa", name: "QA Review" },
+  { key: "pending", name: "Pending" },
+  { key: "done", name: "Done" },
+];
+
 interface ProjectTableViewProps {
   tasks: Task[];
   onStatusChange: (taskId: string, newStatus: Task["status"]) => void;
   subGroupBy?: SubGroupBy;
+  boardStatuses?: Array<{ key: string; name: string }>;
 }
-
-const statusOptions = [
-  { value: "todo", label: "To Do" },
-  { value: "in-progress", label: "In Progress" },
-  { value: "qa", label: "QA Review" },
-  { value: "pending", label: "Pending" },
-  { value: "done", label: "Done" },
-];
 
 const getPriorityBorderColor = (priority: string) => {
   switch (priority) {
@@ -53,11 +54,14 @@ export function ProjectTableView({
   tasks,
   onStatusChange,
   subGroupBy = "none",
+  boardStatuses,
 }: ProjectTableViewProps) {
+  const statuses =
+    boardStatuses && boardStatuses.length > 0 ? boardStatuses : DEFAULT_STATUSES;
+
   const groups = groupTasks(tasks, subGroupBy);
   const grouped = subGroupBy !== "none";
 
-  // Flatten with group header markers
   type Row =
     | {
         kind: "group";
@@ -67,6 +71,7 @@ export function ProjectTableView({
         count: number;
       }
     | { kind: "task"; task: Task };
+
   const rows: Row[] = [];
   if (grouped) {
     groups.forEach((g) => {
@@ -115,7 +120,7 @@ export function ProjectTableView({
         colSpan={8}
         className="h-10 py-0 text-xs text-muted-foreground"
       >
-        {subGroupLabels[subGroupBy]} group Â· {count} tasks
+        {subGroupLabels[subGroupBy]} group &middot; {count} tasks
       </TableCell>
     </TableRow>
   );
@@ -150,6 +155,7 @@ export function ProjectTableView({
                   <ViewTaskDialog
                     key={row.task.id}
                     task={row.task}
+                    boardStatuses={statuses}
                     trigger={
                       <TableRow className="hover:bg-muted/30 dark:hover:bg-muted/20 h-14 cursor-pointer">
                         <TableCell className="font-medium h-14 py-0">
@@ -205,6 +211,7 @@ export function ProjectTableView({
                   <ViewTaskDialog
                     key={row.task.id}
                     task={row.task}
+                    boardStatuses={statuses}
                     trigger={
                       <TableRow className="hover:bg-muted/30 dark:hover:bg-muted/20 h-14 cursor-pointer">
                         {/* Status */}
@@ -215,22 +222,16 @@ export function ProjectTableView({
                           <Select
                             value={row.task.status}
                             onValueChange={(value) =>
-                              onStatusChange(
-                                row.task.id,
-                                value as Task["status"],
-                              )
+                              onStatusChange(row.task.id, value as Task["status"])
                             }
                           >
                             <SelectTrigger className="w-[130px] h-8 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {statusOptions.map((option) => (
-                                <SelectItem
-                                  key={option.value}
-                                  value={option.value}
-                                >
-                                  {option.label}
+                              {statuses.map((s) => (
+                                <SelectItem key={s.key} value={s.key}>
+                                  {s.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -278,30 +279,25 @@ export function ProjectTableView({
                               </span>
                             </div>
                           ) : (
-                            <span className="text-muted-foreground text-sm">
-                              â€”
-                            </span>
+                            <span className="text-muted-foreground text-sm">&mdash;</span>
                           )}
                         </TableCell>
 
                         <TableCell className="h-14 py-0">
                           {row.task.dueDate ? (
                             <span className="text-sm text-foreground">
-                              {format(
-                                new Date(row.task.dueDate),
-                                "MMM d, yyyy",
-                              )}
+                              {format(new Date(row.task.dueDate), "MMM d, yyyy")}
                             </span>
                           ) : (
-                            <span className="text-muted-foreground text-sm">
-                              â€”
-                            </span>
+                            <span className="text-muted-foreground text-sm">&mdash;</span>
                           )}
                         </TableCell>
 
                         <TableCell className="h-14 py-0">
                           <span className="text-sm text-muted-foreground">
-                            {format(new Date("2024-12-01"), "MMM d, yyyy")}
+                            {row.task.createdAt
+                              ? format(new Date(row.task.createdAt), "MMM d, yyyy")
+                              : "&mdash;"}
                           </span>
                         </TableCell>
 
@@ -317,17 +313,13 @@ export function ProjectTableView({
                               </Badge>
                             ))}
                             {!row.task.labels?.length && (
-                              <span className="text-muted-foreground text-sm">
-                                â€”
-                              </span>
+                              <span className="text-muted-foreground text-sm">&mdash;</span>
                             )}
                           </div>
                         </TableCell>
 
                         <TableCell className="h-14 py-0">
-                          <span className="text-sm text-muted-foreground">
-                            â€”
-                          </span>
+                          <span className="text-sm text-muted-foreground">&mdash;</span>
                         </TableCell>
                       </TableRow>
                     }

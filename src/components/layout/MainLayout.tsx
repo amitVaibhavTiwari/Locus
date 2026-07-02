@@ -32,6 +32,7 @@ interface MainLayoutProps {
   orgName: string;
   brandColor: string | null;
   userRole: "owner" | "admin" | "member";
+  pinnedProjects: { id: string; name: string }[];
 }
 
 function getInitials(name: string) {
@@ -124,6 +125,7 @@ export function MainLayout({
   orgName,
   brandColor,
   userRole,
+  pinnedProjects,
 }: MainLayoutProps) {
   useEffect(() => {
     if (!brandColor) return;
@@ -140,7 +142,11 @@ export function MainLayout({
     <>
       <SplashScreen />
       <SidebarProvider defaultOpen={true}>
-        <AppSidebar workspaceName={orgName} userRole={userRole} />
+        <AppSidebar
+          workspaceName={orgName}
+          userRole={userRole}
+          pinnedProjects={pinnedProjects}
+        />
         <AppContent user={user}>{children}</AppContent>
       </SidebarProvider>
     </>

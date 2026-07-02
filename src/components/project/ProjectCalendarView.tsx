@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 
 interface ProjectCalendarViewProps {
   tasks: Task[];
+  boardStatuses?: Array<{ key: string; name: string }>;
 }
 
-export function ProjectCalendarView({ tasks }: ProjectCalendarViewProps) {
+export function ProjectCalendarView({ tasks, boardStatuses }: ProjectCalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const daysInMonth = new Date(
@@ -137,6 +138,7 @@ export function ProjectCalendarView({ tasks }: ProjectCalendarViewProps) {
                   <ViewTaskDialog
                     key={task.id}
                     task={task}
+                    boardStatuses={boardStatuses}
                     trigger={
                       <div
                         className={`px-2 py-1 text-xs cursor-pointer border-l-2 ${getPriorityColor(

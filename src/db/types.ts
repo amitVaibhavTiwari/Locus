@@ -100,6 +100,96 @@ export interface PendingVerificationsTable {
   created_at: string;
 }
 
+export interface ProjectsTable {
+  id: string;
+  organization_id: string;
+  name: string;
+  key: string;
+  slug: string;
+  description: string | null;
+  visibility: "public" | "private";
+  priority: string | null;
+  archived: number;
+  allow_delete_tickets: number;
+  allow_manage_sprint: number;
+  allow_members_edit: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectMembersTable {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role: "manager" | "member";
+  joined_at: string;
+}
+
+export interface BoardsTable {
+  id: string;
+  project_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface ColumnsTable {
+  id: string;
+  board_id: string;
+  name: string;
+  key: string | null;
+  order_index: number;
+  wip_limit: number | null;
+  created_at: string;
+}
+
+export interface LabelsTable {
+  id: string;
+  organization_id: string;
+  project_id: string | null;
+  name: string;
+  color: string;
+  created_at: string;
+}
+
+export interface IssuesTable {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  board_id: string | null;
+  column_id: string | null;
+  parent_issue_id: string | null;
+  issue_number: number;
+  title: string;
+  description: string | null;
+  type: "task" | "story" | "bug" | "subtask";
+  status: string;
+  priority: string;
+  reporter_id: string;
+  assignee_id: string | null;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IssueLabelsTable {
+  id: string;
+  issue_id: string;
+  label_id: string;
+}
+
+export interface ActivitiesTable {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  issue_id: string | null;
+  user_id: string;
+  type: string;
+  payload: string;
+  created_at: string;
+}
+
 export interface Database {
   users: UsersTable;
   accounts: AccountsTable;
@@ -111,4 +201,12 @@ export interface Database {
   workspace_preferences: WorkspacePreferencesTable;
   user_preferences: UserPreferencesTable;
   pending_verifications: PendingVerificationsTable;
+  projects: ProjectsTable;
+  project_members: ProjectMembersTable;
+  boards: BoardsTable;
+  columns: ColumnsTable;
+  labels: LabelsTable;
+  issues: IssuesTable;
+  issue_labels: IssueLabelsTable;
+  activities: ActivitiesTable;
 }

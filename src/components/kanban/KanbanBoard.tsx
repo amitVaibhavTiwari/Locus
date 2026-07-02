@@ -21,7 +21,7 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  status: "todo" | "in-progress" | "qa" | "pending" | "done";
+  status: string;
   priority: "low" | "medium" | "high";
   assignee?: {
     name: string;
@@ -38,29 +38,40 @@ export interface Task {
   dueDate?: string;
   comments?: number;
   attachments?: number;
+  issueNumber?: number;
+  assigneeId?: string | null;
+  reporterId?: string | null;
+  type?: "task" | "story" | "bug" | "subtask";
+  createdAt?: string;
 }
 
-const columns = [
-  { id: "todo", title: "To Do", color: "todo" },
-  { id: "in-progress", title: "In Progress", color: "in-progress" },
-  { id: "qa", title: "QA Review", color: "qa" },
-  { id: "pending", title: "Pending Deployment", color: "pending" },
-  { id: "done", title: "Done", color: "done" },
-] as const;
+const DEFAULT_COLUMNS = [
+  { id: "todo", title: "To Do" },
+  { id: "in-progress", title: "In Progress" },
+  { id: "qa", title: "QA Review" },
+  { id: "pending", title: "Pending Deployment" },
+  { id: "done", title: "Done" },
+];
 
 interface KanbanBoardProps {
   projectId: string;
   projectName: string;
   externalTasks?: Task[];
   onTasksChange?: (tasks: Task[]) => void;
+  onMoveIssue?: (issueId: string, newStatus: string) => void;
   subGroupBy?: import("@/lib/subGroup").SubGroupBy;
+  boardColumns?: Array<{ id: string; title: string }>;
 }
 
 export function KanbanBoard({
   externalTasks,
   onTasksChange,
+  onMoveIssue,
   subGroupBy = "none",
+  boardColumns,
 }: KanbanBoardProps) {
+  const columns = boardColumns ?? DEFAULT_COLUMNS;
+  const boardStatuses = columns.map((c) => ({ key: c.id, name: c.title }));
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const tasks = externalTasks || [];
 
@@ -88,18 +99,14 @@ export function KanbanBoard({
     if (!activeTask) return;
 
     // Determine the new status - check if 'over' is a column or a task
-    let newStatus: Task["status"];
+    let newStatus: string;
     const overTask = tasks.find((task) => task.id === over.id);
 
     if (overTask) {
-      // Dropped on a task, use that task's status
       newStatus = overTask.status;
     } else {
-      // Dropped on a column (id may be "status::groupKey")
       const raw = String(over.id);
-      newStatus = (
-        raw.includes("::") ? raw.split("::")[0] : raw
-      ) as Task["status"];
+      newStatus = raw.includes("::") ? raw.split("::")[0] : raw;
     }
 
     // Handling reordering within same column or moving to different column
@@ -144,6 +151,8 @@ export function KanbanBoard({
       } else {
         onTasksChange(updatedTasks);
       }
+
+      onMoveIssue?.(activeTask.id, newStatus);
     }
   };
 
@@ -163,6 +172,7 @@ export function KanbanBoard({
   return (
     <div className="pt-6">
       <DndContext
+        id="kanban-board"
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -174,6 +184,7 @@ export function KanbanBoard({
                 key={column.id}
                 column={column}
                 tasks={getTasksByStatus(column.id)}
+                boardStatuses={boardStatuses}
               />
             ))}
           </div>
@@ -221,6 +232,7 @@ export function KanbanBoard({
                           tasks={g.tasks.filter((t) => t.status === column.id)}
                           hideHeaderCount={false}
                           droppableIdSuffix={g.key}
+                          boardStatuses={boardStatuses}
                         />
                       ))}
                     </div>

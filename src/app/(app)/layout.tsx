@@ -1,7 +1,12 @@
 import React from "react";
 import { redirect } from "next/navigation";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { getSessionUser, getActiveOrg, getCurrentUserOrgRole } from "@/lib/dal";
+import {
+  getSessionUser,
+  getActiveOrg,
+  getCurrentUserOrgRole,
+  getPinnedProjects,
+} from "@/lib/dal";
 
 export default async function AppLayout({
   children,
@@ -18,12 +23,15 @@ export default async function AppLayout({
   const orgName = org.workspacePrefs?.display_name ?? org.name;
   const brandColor = org.workspacePrefs?.brand_color ?? null;
 
+  const pinnedProjects = user ? await getPinnedProjects(user.id, org.id) : [];
+
   return (
     <MainLayout
       user={user}
       orgName={orgName}
       brandColor={brandColor}
       userRole={userRole ?? "member"}
+      pinnedProjects={pinnedProjects}
     >
       {children}
     </MainLayout>

@@ -1,5 +1,5 @@
-﻿"use client";
-import React, { useState } from "react";
+"use client";
+import React, { useState, useTransition } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,49 +18,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, X, Paperclip, Upload, Search } from "lucide-react";
+import { CalendarIcon, X, Paperclip, Upload, Search, Maximize2, Minimize2 } from "lucide-react";
 import { format } from "date-fns";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { cn } from "@/lib/utils";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { createIssue } from "@/actions/issues";
+
+export interface OrgMember {
+  id: string;
+  username: string;
+  email: string;
+  avatar_url: string | null;
+}
 
 interface CreateTaskDialogProps {
   trigger: React.ReactNode;
+  projectId: string;
+  orgMembers: OrgMember[];
   defaultStatus?: string;
+  onSuccess?: () => void;
   parentTaskId?: string;
   parentTaskTitle?: string;
 }
-
-const teamMembers = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    initials: "SJ",
-    email: "sarah@company.com",
-  },
-  { id: "2", name: "Mike Harrison", initials: "MH", email: "mike@company.com" },
-  { id: "3", name: "Lisa Thompson", initials: "LT", email: "lisa@company.com" },
-  { id: "4", name: "Robert Kim", initials: "RK", email: "robert@company.com" },
-  { id: "5", name: "Anna Miller", initials: "AM", email: "anna@company.com" },
-  { id: "6", name: "John Doe", initials: "JD", email: "john@company.com" },
-  { id: "7", name: "Emma Wilson", initials: "EW", email: "emma@company.com" },
-];
 
 const epics = [
   { id: "1", name: "User Authentication System" },
@@ -71,24 +56,25 @@ const epics = [
 ];
 
 const predefinedLabels = [
-  "Frontend",
-  "Backend",
-  "UI",
-  "Bug",
-  "Feature",
-  "Documentation",
-  "Testing",
-  "Security",
-  "Performance",
+  "Frontend", "Backend", "UI", "Bug", "Feature", "Documentation", "Testing", "Security", "Performance"
 ];
+
+function getInitials(username: string) {
+  return username.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+}
 
 export function CreateTaskDialog({
   trigger,
+  projectId,
+  orgMembers,
   defaultStatus = "todo",
+  onSuccess,
   parentTaskId,
   parentTaskTitle,
 }: CreateTaskDialogProps) {
   const [open, setOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [taskTitle, setTaskTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("");
@@ -103,7 +89,7 @@ export function CreateTaskDialog({
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [epicOpen, setEpicOpen] = useState(false);
   const [reporterOpen, setReporterOpen] = useState(false);
-  const [reporter, setReporter] = useState(teamMembers[0].id); // Default to current user
+  const [reporter, setReporter] = useState(orgMembers[0]?.id ?? "");
   const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -118,24 +104,43 @@ export function CreateTaskDialog({
       return;
     }
 
-    toast({
-      title: "Success",
-      description: `Task "${taskTitle}" created in ${location === "sprint" ? "current sprint" : "backlog"}!`,
-    });
+    const formData = new FormData();
+    formData.set("project_id", projectId);
+    formData.set("title", taskTitle.trim());
+    formData.set("description", description);
+    formData.set("status", status);
+    formData.set("priority", priority || "medium");
+    formData.set("type", "task");
+    if (assignee) formData.set("assignee_id", assignee);
+    if (dueDate) formData.set("due_date", format(dueDate, "yyyy-MM-dd"));
 
-    // Reset form
-    setTaskTitle("");
-    setDescription("");
-    setPriority("");
-    setStatus(defaultStatus);
-    setAssignee("");
-    setDueDate(undefined);
-    setLabels([]);
-    setCustomLabel("");
-    setAttachments([]);
-    setEpic("");
-    setLocation("sprint");
-    setOpen(false);
+    startTransition(async () => {
+      const result = await createIssue(undefined, formData);
+      if (result?.error) {
+        toast({ title: "Error", description: result.error, variant: "destructive" });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: `Task "${taskTitle}" created in ${location === "sprint" ? "current sprint" : "backlog"}!`,
+      });
+
+      // Reset form
+      setTaskTitle("");
+      setDescription("");
+      setPriority("");
+      setStatus(defaultStatus);
+      setAssignee("");
+      setDueDate(undefined);
+      setLabels([]);
+      setCustomLabel("");
+      setAttachments([]);
+      setEpic("");
+      setLocation("sprint");
+      setOpen(false);
+      onSuccess?.();
+    });
   };
 
   const addLabel = (label: string) => {
@@ -145,7 +150,7 @@ export function CreateTaskDialog({
   };
 
   const removeLabel = (label: string) => {
-    setLabels(labels.filter((l) => l !== label));
+    setLabels(labels.filter(l => l !== label));
   };
 
   const addCustomLabel = () => {
@@ -157,26 +162,40 @@ export function CreateTaskDialog({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setAttachments((prev) => [...prev, ...files]);
+    setAttachments(prev => [...prev, ...files]);
   };
 
   const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <DialogTrigger asChild>
+        {trigger}
+      </DialogTrigger>
+      <DialogContent className={`${isExpanded ? "sm:max-w-[calc(100vw-2rem)]" : "sm:max-w-[800px]"} max-h-[90vh] overflow-y-auto transition-all duration-200`}>
         <DialogHeader>
-          <DialogTitle>
-            {parentTaskId ? "Create Subtask" : "Create New Task"}
-          </DialogTitle>
-          <DialogDescription>
-            {parentTaskId
-              ? "Fill in the details below to create a subtask."
-              : "Fill in the details below to create a new task."}
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <DialogTitle>{parentTaskId ? "Create Subtask" : "Create New Task"}</DialogTitle>
+              <DialogDescription className="mt-1">
+                {parentTaskId
+                  ? "Fill in the details below to create a subtask."
+                  : "Fill in the details below to create a new task."
+                }
+              </DialogDescription>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0 -mt-1 -mr-2"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -239,8 +258,8 @@ export function CreateTaskDialog({
                   <SelectContent>
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in-progress">In Progress</SelectItem>
-                    <SelectItem value="qa">QA Review</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="qa">In QA</SelectItem>
+                    <SelectItem value="pending">Pending Deployment</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
                   </SelectContent>
                 </Select>
@@ -269,14 +288,12 @@ export function CreateTaskDialog({
                       {assignee ? (
                         <div className="flex items-center gap-2">
                           <Avatar className="w-5 h-5">
+                            <AvatarImage src={orgMembers.find(m => m.id === assignee)?.avatar_url ?? undefined} />
                             <AvatarFallback className="text-xs">
-                              {
-                                teamMembers.find((m) => m.id === assignee)
-                                  ?.initials
-                              }
+                              {getInitials(orgMembers.find(m => m.id === assignee)?.username ?? "")}
                             </AvatarFallback>
                           </Avatar>
-                          {teamMembers.find((m) => m.id === assignee)?.name}
+                          {orgMembers.find(m => m.id === assignee)?.username}
                         </div>
                       ) : (
                         <>
@@ -292,25 +309,22 @@ export function CreateTaskDialog({
                       <CommandList>
                         <CommandEmpty>No person found.</CommandEmpty>
                         <CommandGroup>
-                          {teamMembers.map((member) => (
+                          {orgMembers.map((member) => (
                             <CommandItem
                               key={member.id}
-                              value={member.name}
+                              value={member.username}
                               onSelect={() => {
                                 setAssignee(member.id);
                                 setAssigneeOpen(false);
                               }}
                             >
                               <Avatar className="w-6 h-6 mr-2">
-                                <AvatarFallback className="text-xs">
-                                  {member.initials}
-                                </AvatarFallback>
+                                <AvatarImage src={member.avatar_url ?? undefined} />
+                                <AvatarFallback className="text-xs">{getInitials(member.username)}</AvatarFallback>
                               </Avatar>
                               <div className="flex flex-col">
-                                <span className="text-sm">{member.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {member.email}
-                                </span>
+                                <span className="text-sm">{member.username}</span>
+                                <span className="text-xs text-muted-foreground">{member.email}</span>
                               </div>
                             </CommandItem>
                           ))}
@@ -324,9 +338,7 @@ export function CreateTaskDialog({
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   Reporter
-                  <span className="text-xs font-normal text-muted-foreground">
-                    (cannot be edited once task is created)
-                  </span>
+                  <span className="text-xs font-normal text-muted-foreground">(cannot be edited once task is created)</span>
                 </Label>
                 <Popover open={reporterOpen} onOpenChange={setReporterOpen}>
                   <PopoverTrigger asChild>
@@ -334,14 +346,12 @@ export function CreateTaskDialog({
                       {reporter ? (
                         <div className="flex items-center gap-2">
                           <Avatar className="w-5 h-5">
+                            <AvatarImage src={orgMembers.find(m => m.id === reporter)?.avatar_url ?? undefined} />
                             <AvatarFallback className="text-xs">
-                              {
-                                teamMembers.find((m) => m.id === reporter)
-                                  ?.initials
-                              }
+                              {getInitials(orgMembers.find(m => m.id === reporter)?.username ?? "")}
                             </AvatarFallback>
                           </Avatar>
-                          {teamMembers.find((m) => m.id === reporter)?.name}
+                          {orgMembers.find(m => m.id === reporter)?.username}
                         </div>
                       ) : (
                         <>
@@ -357,25 +367,22 @@ export function CreateTaskDialog({
                       <CommandList>
                         <CommandEmpty>No person found.</CommandEmpty>
                         <CommandGroup>
-                          {teamMembers.map((member) => (
+                          {orgMembers.map((member) => (
                             <CommandItem
                               key={member.id}
-                              value={member.name}
+                              value={member.username}
                               onSelect={() => {
                                 setReporter(member.id);
                                 setReporterOpen(false);
                               }}
                             >
                               <Avatar className="w-6 h-6 mr-2">
-                                <AvatarFallback className="text-xs">
-                                  {member.initials}
-                                </AvatarFallback>
+                                <AvatarImage src={member.avatar_url ?? undefined} />
+                                <AvatarFallback className="text-xs">{getInitials(member.username)}</AvatarFallback>
                               </Avatar>
                               <div className="flex flex-col">
-                                <span className="text-sm">{member.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {member.email}
-                                </span>
+                                <span className="text-sm">{member.username}</span>
+                                <span className="text-xs text-muted-foreground">{member.email}</span>
                               </div>
                             </CommandItem>
                           ))}
@@ -418,7 +425,7 @@ export function CreateTaskDialog({
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start">
                       {epic ? (
-                        epics.find((e) => e.id === epic)?.name
+                        epics.find(e => e.id === epic)?.name
                       ) : (
                         <>
                           <Search className="w-4 h-4 mr-2" />
@@ -463,9 +470,7 @@ export function CreateTaskDialog({
                     variant={labels.includes(label) ? "default" : "outline"}
                     size="sm"
                     onClick={() =>
-                      labels.includes(label)
-                        ? removeLabel(label)
-                        : addLabel(label)
+                      labels.includes(label) ? removeLabel(label) : addLabel(label)
                     }
                   >
                     {label}
@@ -478,9 +483,7 @@ export function CreateTaskDialog({
                   value={customLabel}
                   onChange={(e) => setCustomLabel(e.target.value)}
                   placeholder="Add custom label"
-                  onKeyPress={(e) =>
-                    e.key === "Enter" && (e.preventDefault(), addCustomLabel())
-                  }
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomLabel())}
                 />
                 <Button type="button" onClick={addCustomLabel} size="sm">
                   Add
@@ -490,11 +493,7 @@ export function CreateTaskDialog({
               {labels.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {labels.map((label) => (
-                    <Badge
-                      key={label}
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
+                    <Badge key={label} variant="secondary" className="flex items-center gap-1">
                       {label}
                       <X
                         className="w-3 h-3 cursor-pointer"
@@ -533,10 +532,7 @@ export function CreateTaskDialog({
               {attachments.length > 0 && (
                 <div className="space-y-2">
                   {attachments.map((file, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-2 bg-secondary/30 rounded"
-                    >
+                    <div key={index} className="flex items-center justify-between p-2 bg-secondary/30 rounded">
                       <div className="flex items-center gap-2">
                         <Paperclip className="w-4 h-4" />
                         <span className="text-sm">{file.name}</span>
@@ -560,14 +556,12 @@ export function CreateTaskDialog({
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
               Cancel
             </Button>
-            <Button type="submit">Create Task</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Creating..." : "Create Task"}
+            </Button>
           </div>
         </form>
       </DialogContent>

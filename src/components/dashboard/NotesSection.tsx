@@ -735,6 +735,7 @@ export function NotesSection() {
           </CardHeader>
           <CardContent>
             <DndContext
+              id="notes-tasks-dnd"
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={handleNoteDragEnd}
@@ -854,6 +855,7 @@ export function NotesSection() {
           </CardHeader>
           <CardContent>
             <DndContext
+              id="notes-links-dnd"
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={handleLinkDragEnd}

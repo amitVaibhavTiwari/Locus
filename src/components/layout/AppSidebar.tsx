@@ -27,7 +27,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useWorkspaceStore } from "@/stores/workspaceStore";
 
 const mainNavigation = [
   { title: "Home", url: "/dashboard", icon: LayoutDashboard },
@@ -51,12 +50,11 @@ const getProjectSubMenu = (projectId: string) => [
 interface AppSidebarProps {
   workspaceName: string;
   userRole: "owner" | "admin" | "member";
+  pinnedProjects: { id: string; name: string }[];
 }
 
-export function AppSidebar({ workspaceName, userRole }: AppSidebarProps) {
+export function AppSidebar({ workspaceName, userRole, pinnedProjects }: AppSidebarProps) {
   const currentPath = usePathname();
-  const { pinnedProjects } = useWorkspaceStore();
-
   const [openProjects, setOpenProjects] = useState<Record<string, boolean>>({});
 
   const toggleProject = (projectId: string) => {
@@ -144,9 +142,7 @@ export function AppSidebar({ workspaceName, userRole }: AppSidebarProps) {
                           ) : (
                             <ChevronRight className="w-4 h-4 mr-2" />
                           )}
-                          <div
-                            className={`w-3 h-3 rounded-full mr-2 bg-kanban-${project.color}`}
-                          />
+                          <div className="w-3 h-3 rounded-full mr-2 bg-primary/60" />
                           <span className="font-medium truncate">
                             {project.name}
                           </span>

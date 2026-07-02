@@ -11,9 +11,10 @@ import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 interface TaskCardProps {
   task: Task;
   isDragging?: boolean;
+  boardStatuses?: Array<{ key: string; name: string }>;
 }
 
-export function TaskCard({ task, isDragging = false }: TaskCardProps) {
+export function TaskCard({ task, isDragging = false, boardStatuses }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -48,6 +49,7 @@ export function TaskCard({ task, isDragging = false }: TaskCardProps) {
   return (
     <ViewTaskDialog
       task={task}
+      boardStatuses={boardStatuses}
       trigger={
         <Card
           ref={setNodeRef}

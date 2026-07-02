@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 interface Column {
   id: string;
   title: string;
-  color: string;
 }
 
 interface KanbanColumnProps {
@@ -19,6 +18,7 @@ interface KanbanColumnProps {
   tasks: Task[];
   hideHeaderCount?: boolean;
   droppableIdSuffix?: string;
+  boardStatuses?: Array<{ key: string; name: string }>;
 }
 
 export function KanbanColumn({
@@ -26,6 +26,7 @@ export function KanbanColumn({
   tasks,
   hideHeaderCount,
   droppableIdSuffix,
+  boardStatuses,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: droppableIdSuffix ? `${column.id}::${droppableIdSuffix}` : column.id,
@@ -41,7 +42,7 @@ export function KanbanColumn({
         } transition-all duration-200`}
       >
         <div
-          className={`sticky top-0 z-10 bg-surface backdrop-blur-sm rounded-t-lg p-4 border-b border-border column-${column.color}`}
+          className="sticky top-0 z-10 bg-surface backdrop-blur-sm rounded-t-lg p-4 border-b border-border"
         >
           <div className="flex items-center gap-3">
             <h3 className="font-semibold text-foreground">{column.title}</h3>
@@ -59,7 +60,7 @@ export function KanbanColumn({
             strategy={verticalListSortingStrategy}
           >
             {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
+              <TaskCard key={task.id} task={task} boardStatuses={boardStatuses} />
             ))}
           </SortableContext>
 

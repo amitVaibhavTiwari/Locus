@@ -42,10 +42,7 @@ export default async function InvitePage({
     );
   }
 
-  const expiresAt =
-    invite.expires_at instanceof Date
-      ? invite.expires_at
-      : new Date(invite.expires_at as unknown as string);
+  const expiresAt = new Date(invite.expires_at);
 
   if (expiresAt < new Date()) {
     return <InvalidInvite message="This invitation has expired." />;
@@ -85,7 +82,7 @@ export default async function InvitePage({
     }
 
     // Auto-accept
-    const now = new Date();
+    const now = new Date().toISOString();
 
     await db.transaction().execute(async (trx) => {
       await trx
