@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,7 +21,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   Collapsible,
@@ -49,9 +48,14 @@ const getProjectSubMenu = (projectId: string) => [
   { title: "Settings", url: `/project/${projectId}/settings` },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  workspaceName: string;
+  userRole: "owner" | "admin" | "member";
+}
+
+export function AppSidebar({ workspaceName, userRole }: AppSidebarProps) {
   const currentPath = usePathname();
-  const { workspaceName, pinnedProjects } = useWorkspaceStore();
+  const { pinnedProjects } = useWorkspaceStore();
 
   const [openProjects, setOpenProjects] = useState<Record<string, boolean>>({});
 
@@ -175,28 +179,29 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Settings */}
-        <div className="mt-auto border-t border-border">
-          <SidebarGroup className="px-3 py-2">
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {settingsNavigation.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <Link
-                        href={item.url}
-                        className={getNavClassName(item.url)}
-                      >
-                        <item.icon className="w-5 h-5 mr-3" />
-                        <span className="font-medium">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </div>
+        {userRole === "owner" && (
+          <div className="mt-auto border-t border-border">
+            <SidebarGroup className="px-3 py-2">
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-1">
+                  {settingsNavigation.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild>
+                        <Link
+                          href={item.url}
+                          className={getNavClassName(item.url)}
+                        >
+                          <item.icon className="w-5 h-5 mr-3" />
+                          <span className="font-medium">{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </div>
+        )}
       </SidebarContent>
     </Sidebar>
   );

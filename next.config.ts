@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
-  serverExternalPackages: ["kysely", "pg", "better-sqlite3"],
+  serverExternalPackages: ["kysely"],
 };
 
 export default nextConfig;

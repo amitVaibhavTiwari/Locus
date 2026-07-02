@@ -1,15 +1,15 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { useWorkspaceStore, ThemeColor } from "@/stores/workspaceStore";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Check, Monitor, Moon, Sun } from "lucide-react";
+import { Check, Monitor, Moon, Sun, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { createWorkspace } from "@/actions/organizations";
 
 const SIZES = ["Just myself", "2-10", "11-50", "51-200", "201-500", "500+"];
 
@@ -31,11 +31,10 @@ const slugify = (s: string) =>
     .replace(/^-|-$/g, "");
 
 export default function CreateWorkspace() {
-  const router = useRouter();
-  const setWorkspaceName = useWorkspaceStore((s) => s.setWorkspaceName);
   const setThemeColor = useWorkspaceStore((s) => s.setThemeColor);
   const storeTheme = useWorkspaceStore((s) => s.themeColor);
   const { setTheme: setAppTheme } = useTheme();
+  const [isPending, startTransition] = useTransition();
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -72,11 +71,23 @@ export default function CreateWorkspace() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return toast.error("Enter a workspace name");
-    setWorkspaceName(name.trim());
+
     setThemeColor(theme);
     localStorage.setItem("theme", appearance);
-    toast.success("Workspace created");
-    router.push("/onboarding/invite");
+
+    const formData = new FormData();
+    formData.set("name", name.trim());
+    formData.set("slug", effectiveSlug);
+    const brandColorHsl =
+      THEME_COLORS.find((t) => t.value === theme)?.hsl ?? "25 95% 53%";
+    formData.set("brand_color", `hsl(${brandColorHsl})`);
+
+    startTransition(async () => {
+      const result = await createWorkspace(undefined, formData);
+      if (result?.errors?.slug?.[0]) toast.error(result.errors.slug[0]);
+      else if (result?.errors?.name?.[0]) toast.error(result.errors.name[0]);
+      else if (result?.error) toast.error(result.error);
+    });
   };
 
   const appearanceOptions: {
@@ -215,8 +226,12 @@ export default function CreateWorkspace() {
           </div>
         </div>
 
-        <Button type="submit" className="w-full">
-          Continue
+        <Button type="submit" disabled={isPending} className="w-full">
+          {isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            "Continue"
+          )}
         </Button>
       </form>
     </AuthShell>

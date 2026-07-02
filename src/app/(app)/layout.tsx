@@ -1,6 +1,31 @@
 import React from "react";
+import { redirect } from "next/navigation";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { getSessionUser, getActiveOrg, getCurrentUserOrgRole } from "@/lib/dal";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <MainLayout>{children}</MainLayout>;
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [user, org, userRole] = await Promise.all([
+    getSessionUser(),
+    getActiveOrg(),
+    getCurrentUserOrgRole(),
+  ]);
+  if (!org) redirect("/onboarding/workspace");
+
+  const orgName = org.workspacePrefs?.display_name ?? org.name;
+  const brandColor = org.workspacePrefs?.brand_color ?? null;
+
+  return (
+    <MainLayout
+      user={user}
+      orgName={orgName}
+      brandColor={brandColor}
+      userRole={userRole ?? "member"}
+    >
+      {children}
+    </MainLayout>
+  );
 }

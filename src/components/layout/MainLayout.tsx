@@ -1,5 +1,5 @@
 ﻿"use client";
-import React from "react";
+import React, { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   SidebarProvider,
@@ -7,6 +7,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+import { SplashScreen } from "./SplashScreen";
 import { LogOut, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -16,14 +17,45 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { logoutUser } from "@/actions/auth";
+
+type SessionUser = {
+  id: string;
+  email: string;
+  username: string;
+  avatar_url: string | null;
+} | null;
 
 interface MainLayoutProps {
   children: React.ReactNode;
+  user: SessionUser;
+  orgName: string;
+  brandColor: string | null;
+  userRole: "owner" | "admin" | "member";
 }
 
-function AppContent({ children }: { children: React.ReactNode }) {
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function AppContent({
+  children,
+  user,
+}: {
+  children: React.ReactNode;
+  user: SessionUser;
+}) {
   const router = useRouter();
   const { open } = useSidebar();
+  const [, startTransition] = useTransition();
+
+  const displayName = user?.username ?? "User";
+  const initials = getInitials(displayName);
 
   return (
     <div
@@ -42,22 +74,22 @@ function AppContent({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center gap-3 pl-3 border-l border-border cursor-pointer rounded-sm px-2 py-1 transition-colors group">
                   <div className="text-right">
                     <p className="text-sm font-medium group-hover:underline">
-                      Sarah Johnson
+                      {displayName}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Project Manager
+                      {user?.email ?? ""}
                     </p>
                   </div>
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      SJ
+                      {initials}
                     </AvatarFallback>
                   </Avatar>
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem
-                  onClick={() => router.push("/team/1")}
+                  onClick={() => router.push(`/team/${user?.id}`)}
                   className="cursor-pointer"
                 >
                   <User className="w-4 h-4 mr-2" />
@@ -65,7 +97,11 @@ function AppContent({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => router.push("/login")}
+                  onClick={() =>
+                    startTransition(() => {
+                      logoutUser();
+                    })
+                  }
                   className="cursor-pointer text-destructive"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
@@ -82,11 +118,31 @@ function AppContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({
+  children,
+  user,
+  orgName,
+  brandColor,
+  userRole,
+}: MainLayoutProps) {
+  useEffect(() => {
+    if (!brandColor) return;
+    const hsl = brandColor
+      .replace(/^hsl\(/, "")
+      .replace(/\)$/, "")
+      .trim();
+    document.documentElement.style.setProperty("--primary", hsl);
+    document.documentElement.style.setProperty("--ring", hsl);
+    document.documentElement.style.setProperty("--sidebar-ring", hsl);
+  }, [brandColor]);
+
   return (
-    <SidebarProvider defaultOpen={true}>
-      <AppSidebar />
-      <AppContent>{children}</AppContent>
-    </SidebarProvider>
+    <>
+      <SplashScreen />
+      <SidebarProvider defaultOpen={true}>
+        <AppSidebar workspaceName={orgName} userRole={userRole} />
+        <AppContent user={user}>{children}</AppContent>
+      </SidebarProvider>
+    </>
   );
 }
