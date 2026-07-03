@@ -28,6 +28,7 @@ interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  projectId?: string;
 }
 
 const colors = [
@@ -61,7 +62,22 @@ export function RichTextEditor({
   content,
   onChange,
   placeholder = "Start typing...",
+  projectId,
 }: RichTextEditorProps) {
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const body = new FormData();
+    body.append("file", file);
+    if (projectId) body.append("projectId", projectId);
+    try {
+      const res = await fetch("/api/upload-image", { method: "POST", body });
+      if (!res.ok) return null;
+      const { url } = await res.json();
+      return url as string;
+    } catch {
+      return null;
+    }
+  };
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -69,10 +85,7 @@ export function RichTextEditor({
       Underline,
       TextStyle,
       Color,
-      Image.configure({
-        inline: true,
-        allowBase64: true,
-      }),
+      Image.configure({ inline: true, allowBase64: false }),
       TextAlign.configure({
         types: ["heading", "paragraph"],
         alignments: ["left", "center", "right"],
@@ -86,22 +99,19 @@ export function RichTextEditor({
       attributes: {
         class: "prose prose-sm max-w-none focus:outline-none min-h-[360px] p-3",
       },
-      handlePaste: (view, event) => {
+      handlePaste: (_view, event) => {
         const items = event.clipboardData?.items;
         if (!items) return false;
 
         for (let i = 0; i < items.length; i++) {
-          if (items[i].type.indexOf("image") !== -1) {
+          if (items[i].type.startsWith("image/")) {
             event.preventDefault();
             const file = items[i].getAsFile();
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                const base64 = e.target?.result as string;
-                editor?.chain().focus().setImage({ src: base64 }).run();
-              };
-              reader.readAsDataURL(file);
-            }
+            if (!file) return true;
+            // Upload to S3 then insert the proxy URL — never embed base64
+            uploadImage(file).then((url) => {
+              if (url) editor?.chain().focus().setImage({ src: url }).run();
+            });
             return true;
           }
         }
@@ -197,7 +207,7 @@ export function RichTextEditor({
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-3">
-            <div className="flex flex-wrap gap-1.5 max-w-[240px]">
+            <div className="flex flex-wrap gap-1.5 max-w-60">
               {colors.map((color) => (
                 <button
                   key={color}

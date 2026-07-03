@@ -42,10 +42,17 @@ interface Member {
   avatar_url: string | null;
 }
 
+interface Sprint {
+  id: string;
+  name: string;
+  status: string;
+}
+
 interface CreateTaskClientProps {
   projectId: string;
   projectName: string;
   statuses: BoardStatus[];
+  sprints: Sprint[];
   initialMembers: Member[];
   currentUserId: string;
   defaultStatus: string;
@@ -170,6 +177,7 @@ export function CreateTaskClient({
   projectId,
   projectName,
   statuses,
+  sprints,
   initialMembers,
   currentUserId,
   defaultStatus,
@@ -192,7 +200,10 @@ export function CreateTaskClient({
   const [customLabel, setCustomLabel] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [epic, setEpic] = useState<{ id: string; name: string } | null>(null);
-  const [location, setLocation] = useState("sprint");
+  // Default to the active sprint if one exists, otherwise backlog (null)
+  const [sprintId, setSprintId] = useState<string | null>(
+    sprints.find((s) => s.status === "active")?.id ?? null,
+  );
   const [epicOpen, setEpicOpen] = useState(false);
   const [epicResults, setEpicResults] = useState<{ id: string; name: string }[]>([]);
   const [epicLoading, setEpicLoading] = useState(false);
@@ -224,6 +235,7 @@ export function CreateTaskClient({
     if (reporter) formData.set("reporter_id", reporter.id);
     if (dueDate) formData.set("due_date", format(dueDate, "yyyy-MM-dd"));
     if (epic) formData.set("epic_id", epic.id);
+    if (sprintId) formData.set("sprint_id", sprintId);
 
     startTransition(async () => {
       const result = await createIssue(undefined, formData);
@@ -231,10 +243,32 @@ export function CreateTaskClient({
         toast({ title: "Error", description: result.error, variant: "destructive" });
         return;
       }
-      toast({
-        title: "Success",
-        description: `Task "${taskTitle}" created in ${location === "sprint" ? "current sprint" : "backlog"}!`,
-      });
+
+      // Upload staged attachments now that we have an issueId
+      if (result?.issueId && attachments.length > 0) {
+        const failed: string[] = [];
+        await Promise.all(
+          attachments.map(async (file) => {
+            const body = new FormData();
+            body.append("file", file);
+            body.append("issueId", result.issueId!);
+            const res = await fetch("/api/upload", { method: "POST", body });
+            if (!res.ok) failed.push(file.name);
+          }),
+        );
+        if (failed.length > 0) {
+          toast({
+            title: "Some attachments failed to upload",
+            description: failed.join(", "),
+            variant: "destructive",
+          });
+        }
+      }
+
+      const locationLabel = sprintId
+        ? (sprints.find((s) => s.id === sprintId)?.name ?? "sprint")
+        : "backlog";
+      toast({ title: "Task created", description: `Added to ${locationLabel}` });
       router.push(`/project/${projectId}`);
     });
   };
@@ -318,6 +352,7 @@ export function CreateTaskClient({
               content={description}
               onChange={setDescription}
               placeholder="Describe the task in detail with formatting, lists, links, images and more..."
+              projectId={projectId}
             />
           </div>
 
@@ -371,13 +406,23 @@ export function CreateTaskClient({
 
             <div className="space-y-2">
               <Label>Location</Label>
-              <Select value={location} onValueChange={setLocation}>
+              <Select
+                value={sprintId ?? "__backlog__"}
+                onValueChange={(v) => setSprintId(v === "__backlog__" ? null : v)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sprint">Current Sprint</SelectItem>
-                  <SelectItem value="backlog">Backlog</SelectItem>
+                  <SelectItem value="__backlog__">Backlog</SelectItem>
+                  {sprints.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                      {s.status === "active" && (
+                        <span className="ml-1 text-xs text-muted-foreground">(active)</span>
+                      )}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

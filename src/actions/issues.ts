@@ -6,8 +6,16 @@ import { db } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 
 const LABEL_COLORS = [
-  "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
-  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#84cc16",
+  "#3b82f6",
+  "#ef4444",
+  "#22c55e",
+  "#f59e0b",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
+  "#6366f1",
+  "#84cc16",
 ];
 
 async function ensureLabel(
@@ -93,6 +101,7 @@ export async function createIssue(
   const labelsJson = formData.get("labels")?.toString();
   const labelNames: string[] = labelsJson ? JSON.parse(labelsJson) : [];
   const epicId = formData.get("epic_id")?.toString() || null;
+  const sprintId = formData.get("sprint_id")?.toString() || null;
 
   const project = await db
     .selectFrom("projects")
@@ -126,7 +135,7 @@ export async function createIssue(
       id: issueId,
       organization_id: project.organization_id,
       project_id: projectId,
-      sprint_id: null,
+      sprint_id: sprintId,
       epic_id: epicId,
       board_id: board.id,
       column_id: columnId,
@@ -148,11 +157,19 @@ export async function createIssue(
 
   if (labelNames.length > 0) {
     const labelIds = await Promise.all(
-      labelNames.map((name) => ensureLabel(project.organization_id, projectId, name)),
+      labelNames.map((name) =>
+        ensureLabel(project.organization_id, projectId, name),
+      ),
     );
     await db
       .insertInto("issue_labels")
-      .values(labelIds.map((labelId) => ({ id: randomUUID(), issue_id: issueId, label_id: labelId })))
+      .values(
+        labelIds.map((labelId) => ({
+          id: randomUUID(),
+          issue_id: issueId,
+          label_id: labelId,
+        })),
+      )
       .execute();
   }
 
@@ -208,7 +225,12 @@ export async function moveIssue(
   const now = new Date().toISOString();
   await db
     .updateTable("issues")
-    .set({ status: newStatus, column_id: columnId, completed_at: completedAt, updated_at: now })
+    .set({
+      status: newStatus,
+      column_id: columnId,
+      completed_at: completedAt,
+      updated_at: now,
+    })
     .where("id", "=", issueId)
     .execute();
 

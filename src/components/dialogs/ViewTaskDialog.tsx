@@ -1,5 +1,5 @@
 ﻿"use client";
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -26,6 +26,11 @@ import {
   Send,
   Maximize2,
   Minimize2,
+  Upload,
+  Trash2,
+  FileIcon,
+  ImageIcon,
+  Loader2,
 } from "lucide-react";
 import {
   Select,
@@ -48,6 +53,16 @@ interface Activity {
   user_id: string;
   username: string;
   avatar_url: string | null;
+}
+
+interface Attachment {
+  id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+  created_at: string;
+  uploader_name: string;
+  url: string; // signed URL, valid for 1 hour — never persisted
 }
 
 const DEFAULT_STATUSES = [
@@ -104,6 +119,11 @@ export function ViewTaskDialog({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activitiesLoaded, setActivitiesLoaded] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -117,6 +137,65 @@ export function ViewTaskDialog({
       })
       .catch(() => setActivitiesLoaded(true));
   }, [activeTab, task?.id, activitiesLoaded]);
+
+  useEffect(() => {
+    if (activeTab !== "attachments" || !task?.id || attachmentsLoaded) return;
+    fetch(`/api/attachments/${task.id}`)
+      .then((r) => r.json())
+      .then((data: Attachment[]) => {
+        setAttachments(data);
+        setAttachmentsLoaded(true);
+      })
+      .catch(() => setAttachmentsLoaded(true));
+  }, [activeTab, task?.id, attachmentsLoaded]);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !task?.id) return;
+    e.target.value = "";
+
+    setUploading(true);
+    const body = new FormData();
+    body.append("file", file);
+    body.append("issueId", task.id);
+
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({}));
+        throw new Error(error ?? "Upload failed");
+      }
+      const attachment: Attachment = await res.json();
+      setAttachments((prev) => [...prev, attachment]);
+      toast({ title: "File uploaded" });
+    } catch (err) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!task?.id) return;
+    setDeletingId(attachmentId);
+    try {
+      const res = await fetch(
+        `/api/attachments/${task.id}?attachmentId=${attachmentId}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error("Delete failed");
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      toast({ title: "Attachment deleted" });
+    } catch {
+      toast({ title: "Failed to delete", variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const priority = task?.priority ?? "medium";
 
@@ -176,6 +255,15 @@ export function ViewTaskDialog({
 
   return (
     <>
+      {/* Always in DOM so fileInputRef is never null when the button is clicked */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileSelect}
+        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+      />
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>{trigger}</DialogTrigger>
         <DialogContent
@@ -449,9 +537,95 @@ export function ViewTaskDialog({
                 </TabsContent>
 
                 <TabsContent value="attachments" className="mt-4 space-y-4">
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No attachments yet.
-                  </p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-muted-foreground">
+                      {attachmentsLoaded
+                        ? `${attachments.length} attachment${attachments.length !== 1 ? "s" : ""}`
+                        : "Loading..."}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      {uploading ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-2" />
+                      )}
+                      {uploading ? "Uploading…" : "Upload file"}
+                    </Button>
+                  </div>
+
+                  {!attachmentsLoaded ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : attachments.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground space-y-1">
+                      <Paperclip className="w-8 h-8 mx-auto opacity-30" />
+                      <p className="text-sm">No attachments yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {attachments.map((att) => {
+                        const isImage = att.mime_type.startsWith("image/");
+                        const sizeLabel =
+                          att.size < 1024 * 1024
+                            ? `${(att.size / 1024).toFixed(1)} KB`
+                            : `${(att.size / (1024 * 1024)).toFixed(1)} MB`;
+                        return (
+                          <div
+                            key={att.id}
+                            className="flex items-center gap-3 rounded-md border border-border px-3 py-2.5 hover:bg-muted/30 transition-colors group"
+                          >
+                            <div className="shrink-0 text-muted-foreground">
+                              {isImage ? (
+                                <ImageIcon className="w-5 h-5" />
+                              ) : (
+                                <FileIcon className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <a
+                                href={att.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium text-foreground hover:underline truncate block"
+                              >
+                                {att.filename}
+                              </a>
+                              <p className="text-xs text-muted-foreground">
+                                {sizeLabel} · {att.uploader_name} ·{" "}
+                                {new Date(att.created_at).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  },
+                                )}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteAttachment(att.id)}
+                              disabled={deletingId === att.id}
+                            >
+                              {deletingId === att.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="history" className="mt-4">

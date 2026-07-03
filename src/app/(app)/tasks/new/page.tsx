@@ -5,6 +5,7 @@ import {
   getProject,
   getProjectBoard,
   getProjectMembers,
+  getProjectSprints,
 } from "@/lib/dal";
 import { CreateTaskClient } from "./CreateTaskClient";
 
@@ -13,17 +14,18 @@ export default async function CreateTaskPage({
 }: {
   searchParams: Promise<{ projectId?: string; status?: string }>;
 }) {
-  const { projectId, status: defaultStatus = "todo" } = await searchParams;
+  const { projectId, status: statusParam } = await searchParams;
 
   if (!projectId) redirect("/projects");
 
   const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
   if (!org || !user) redirect("/onboarding/workspace");
 
-  const [project, board, projectMembers] = await Promise.all([
+  const [project, board, projectMembers, allSprints] = await Promise.all([
     getProject(projectId, org.id, user.id),
     getProjectBoard(projectId),
     getProjectMembers(projectId),
+    getProjectSprints(projectId),
   ]);
 
   if (!project) notFound();
@@ -31,6 +33,13 @@ export default async function CreateTaskPage({
   const statuses = (board?.columns ?? [])
     .filter((c) => c.key)
     .map((c) => ({ key: c.key!, name: c.name }));
+
+  // Only active and planned sprints are valid targets for new tasks
+  const sprints = allSprints
+    .filter((s) => s.status === "active" || s.status === "planned")
+    .map((s) => ({ id: s.id, name: s.name, status: s.status }));
+
+  const defaultStatus = statusParam ?? statuses[0]?.key ?? "todo";
 
   const initialMembers = projectMembers.slice(0, 6).map((m) => ({
     id: m.userId,
@@ -44,6 +53,7 @@ export default async function CreateTaskPage({
       projectId={project.id}
       projectName={project.name}
       statuses={statuses}
+      sprints={sprints}
       initialMembers={initialMembers}
       currentUserId={user.id}
       defaultStatus={defaultStatus}

@@ -222,6 +222,18 @@ export interface ActivitiesTable {
   created_at: string;
 }
 
+export interface AttachmentsTable {
+  id: string;
+  issue_id: string;
+  organization_id: string;
+  filename: string;
+  storage_key: string;
+  mime_type: string;
+  size: number;
+  uploaded_by: string;
+  created_at: string;
+}
+
 export interface Database {
   users: UsersTable;
   accounts: AccountsTable;
@@ -243,4 +255,5 @@ export interface Database {
   issues: IssuesTable;
   issue_labels: IssueLabelsTable;
   activities: ActivitiesTable;
+  attachments: AttachmentsTable;
 }
