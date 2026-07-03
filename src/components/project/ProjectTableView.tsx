@@ -319,7 +319,16 @@ export function ProjectTableView({
                         </TableCell>
 
                         <TableCell className="h-14 py-0">
-                          <span className="text-sm text-muted-foreground">&mdash;</span>
+                          {row.task.epicName ? (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-primary/5 border-primary/30 text-primary"
+                            >
+                              {row.task.epicName}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">&mdash;</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     }

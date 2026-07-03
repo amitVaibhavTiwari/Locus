@@ -5,6 +5,38 @@ import { after } from "next/server";
 import { db } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 
+const LABEL_COLORS = [
+  "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
+  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#84cc16",
+];
+
+async function ensureLabel(
+  orgId: string,
+  projectId: string,
+  name: string,
+): Promise<string> {
+  const existing = await db
+    .selectFrom("labels")
+    .where("organization_id", "=", orgId)
+    .where("name", "=", name)
+    .select(["id"])
+    .executeTakeFirst();
+  if (existing) return existing.id;
+  const id = randomUUID();
+  await db
+    .insertInto("labels")
+    .values({
+      id,
+      organization_id: orgId,
+      project_id: projectId,
+      name,
+      color: LABEL_COLORS[Math.floor(Math.random() * LABEL_COLORS.length)],
+      created_at: new Date().toISOString(),
+    })
+    .execute();
+  return id;
+}
+
 async function getColumnIdForStatus(
   boardId: string,
   status: string,
@@ -56,7 +88,11 @@ export async function createIssue(
   const priority = formData.get("priority")?.toString() || "medium";
   const type = formData.get("type")?.toString() || "task";
   const assigneeId = formData.get("assignee_id")?.toString() || null;
+  const reporterId = formData.get("reporter_id")?.toString() || session.user.id;
   const dueDate = formData.get("due_date")?.toString() || null;
+  const labelsJson = formData.get("labels")?.toString();
+  const labelNames: string[] = labelsJson ? JSON.parse(labelsJson) : [];
+  const epicId = formData.get("epic_id")?.toString() || null;
 
   const project = await db
     .selectFrom("projects")
@@ -68,13 +104,21 @@ export async function createIssue(
   const board = await getProjectBoard(projectId);
   if (!board) return { error: "No board found for this project" };
 
-  const [columnId, issueNumber] = await Promise.all([
+  const [columnId, issueNumber, lastCol] = await Promise.all([
     getColumnIdForStatus(board.id, status),
     nextIssueNumber(projectId),
+    db
+      .selectFrom("columns")
+      .where("board_id", "=", board.id)
+      .orderBy("order_index", "desc")
+      .limit(1)
+      .select(["id"])
+      .executeTakeFirst(),
   ]);
 
   const issueId = randomUUID();
   const now = new Date().toISOString();
+  const completedAt = columnId && lastCol?.id === columnId ? now : null;
 
   await db
     .insertInto("issues")
@@ -82,6 +126,8 @@ export async function createIssue(
       id: issueId,
       organization_id: project.organization_id,
       project_id: projectId,
+      sprint_id: null,
+      epic_id: epicId,
       board_id: board.id,
       column_id: columnId,
       parent_issue_id: null,
@@ -91,14 +137,24 @@ export async function createIssue(
       type: type as "task" | "story" | "bug" | "subtask",
       status,
       priority,
-      reporter_id: session.user.id,
+      reporter_id: reporterId,
       assignee_id: assigneeId || null,
       due_date: dueDate,
-      completed_at: null,
+      completed_at: completedAt,
       created_at: now,
       updated_at: now,
     })
     .execute();
+
+  if (labelNames.length > 0) {
+    const labelIds = await Promise.all(
+      labelNames.map((name) => ensureLabel(project.organization_id, projectId, name)),
+    );
+    await db
+      .insertInto("issue_labels")
+      .values(labelIds.map((labelId) => ({ id: randomUUID(), issue_id: issueId, label_id: labelId })))
+      .execute();
+  }
 
   after(async () => {
     await db
@@ -137,10 +193,22 @@ export async function moveIssue(
     ? await getColumnIdForStatus(issue.board_id, newStatus)
     : null;
 
+  let completedAt: string | null = null;
+  if (issue.board_id && columnId) {
+    const lastCol = await db
+      .selectFrom("columns")
+      .where("board_id", "=", issue.board_id)
+      .orderBy("order_index", "desc")
+      .limit(1)
+      .select(["id"])
+      .executeTakeFirst();
+    if (lastCol?.id === columnId) completedAt = new Date().toISOString();
+  }
+
   const now = new Date().toISOString();
   await db
     .updateTable("issues")
-    .set({ status: newStatus, column_id: columnId, updated_at: now })
+    .set({ status: newStatus, column_id: columnId, completed_at: completedAt, updated_at: now })
     .where("id", "=", issueId)
     .execute();
 

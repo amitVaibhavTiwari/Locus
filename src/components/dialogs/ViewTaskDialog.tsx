@@ -1,5 +1,5 @@
-"use client";
-import React, { useState, useTransition } from "react";
+﻿"use client";
+import React, { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -40,6 +40,16 @@ import { moveIssue } from "@/actions/issues";
 
 type TaskPriority = "low" | "medium" | "high";
 
+interface Activity {
+  id: string;
+  type: string;
+  payload: string;
+  created_at: string;
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+}
+
 const DEFAULT_STATUSES = [
   { key: "todo", name: "To Do" },
   { key: "in-progress", name: "In Progress" },
@@ -61,6 +71,8 @@ interface ViewTaskDialogProps {
     dueDate?: string;
     issueNumber?: number;
     createdAt?: string;
+    labels?: string[];
+    epicName?: string | null;
     parentTask?: { id: string; title: string };
   };
   boardStatuses?: Array<{ key: string; name: string }>;
@@ -75,7 +87,10 @@ export function ViewTaskDialog({
   open: externalOpen,
   onOpenChange: externalOnOpenChange,
 }: ViewTaskDialogProps) {
-  const statuses = boardStatuses && boardStatuses.length > 0 ? boardStatuses : DEFAULT_STATUSES;
+  const statuses =
+    boardStatuses && boardStatuses.length > 0
+      ? boardStatuses
+      : DEFAULT_STATUSES;
   const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
@@ -87,8 +102,21 @@ export function ViewTaskDialog({
   const [viewingParentTask, setViewingParentTask] = useState(false);
   const [viewingSubtaskId, setViewingSubtaskId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activitiesLoaded, setActivitiesLoaded] = useState(false);
   const [, startTransition] = useTransition();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (activeTab !== "history" || !task?.id || activitiesLoaded) return;
+    fetch(`/api/issues/${task.id}/activities`)
+      .then((r) => r.json())
+      .then((data: Activity[]) => {
+        setActivities(data);
+        setActivitiesLoaded(true);
+      })
+      .catch(() => setActivitiesLoaded(true));
+  }, [activeTab, task?.id, activitiesLoaded]);
 
   const priority = task?.priority ?? "medium";
 
@@ -125,17 +153,24 @@ export function ViewTaskDialog({
 
   const handleAddComment = () => {
     if (comment.trim()) {
-      toast({ title: "Comment added", description: "Your comment has been posted" });
+      toast({
+        title: "Comment added",
+        description: "Your comment has been posted",
+      });
       setComment("");
     }
   };
 
   const getPriorityColor = (p: string) => {
     switch (p) {
-      case "high": return "text-destructive";
-      case "medium": return "text-warning";
-      case "low": return "text-success";
-      default: return "text-muted-foreground";
+      case "high":
+        return "text-destructive";
+      case "medium":
+        return "text-warning";
+      case "low":
+        return "text-success";
+      default:
+        return "text-muted-foreground";
     }
   };
 
@@ -156,20 +191,28 @@ export function ViewTaskDialog({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => router.push(`/tasks/${task?.id}/edit` as never)}
+                    onClick={() =>
+                      router.push(`/tasks/${task?.id}/edit` as never)
+                    }
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Edit
                   </Button>
                 </div>
-                <DialogTitle className="text-2xl">{task?.title ?? "Untitled"}</DialogTitle>
+                <DialogTitle className="text-2xl">
+                  {task?.title ?? "Untitled"}
+                </DialogTitle>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsFullscreen(!isFullscreen)}
               >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {isFullscreen ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
               </Button>
             </div>
           </DialogHeader>
@@ -204,7 +247,9 @@ export function ViewTaskDialog({
                       Priority:
                     </div>
                     <div className="flex items-center gap-2">
-                      <Flag className={`w-4 h-4 ${getPriorityColor(priority)}`} />
+                      <Flag
+                        className={`w-4 h-4 ${getPriorityColor(priority)}`}
+                      />
                       <span className="text-sm capitalize">{priority}</span>
                     </div>
                   </div>
@@ -217,12 +262,16 @@ export function ViewTaskDialog({
                     {task?.assignee ? (
                       <div className="flex items-center gap-2">
                         <Avatar className="w-6 h-6">
-                          <AvatarFallback className="text-xs">{task.assignee.initials}</AvatarFallback>
+                          <AvatarFallback className="text-xs">
+                            {task.assignee.initials}
+                          </AvatarFallback>
                         </Avatar>
                         <span className="text-sm">{task.assignee.name}</span>
                       </div>
                     ) : (
-                      <span className="text-sm text-muted-foreground">Unassigned</span>
+                      <span className="text-sm text-muted-foreground">
+                        Unassigned
+                      </span>
                     )}
                   </div>
 
@@ -234,12 +283,16 @@ export function ViewTaskDialog({
                     {task?.reporter ? (
                       <div className="flex items-center gap-2">
                         <Avatar className="w-6 h-6">
-                          <AvatarFallback className="text-xs">{task.reporter.initials}</AvatarFallback>
+                          <AvatarFallback className="text-xs">
+                            {task.reporter.initials}
+                          </AvatarFallback>
                         </Avatar>
                         <span className="text-sm">{task.reporter.name}</span>
                       </div>
                     ) : (
-                      <span className="text-sm text-muted-foreground">Unknown</span>
+                      <span className="text-sm text-muted-foreground">
+                        Unknown
+                      </span>
                     )}
                   </div>
                 </div>
@@ -251,7 +304,9 @@ export function ViewTaskDialog({
                       Due Date:
                     </div>
                     <span className="text-sm">
-                      {formattedDueDate ?? <span className="text-muted-foreground">Not set</span>}
+                      {formattedDueDate ?? (
+                        <span className="text-muted-foreground">Not set</span>
+                      )}
                     </span>
                   </div>
 
@@ -261,14 +316,49 @@ export function ViewTaskDialog({
                       Created:
                     </div>
                     <span className="text-sm">
-                      {formattedCreatedAt ?? <span className="text-muted-foreground">Unknown</span>}
+                      {formattedCreatedAt ?? (
+                        <span className="text-muted-foreground">Unknown</span>
+                      )}
                     </span>
                   </div>
                 </div>
               </div>
 
+              {task?.epicName && (
+                <div className="flex items-center gap-3">
+                  <div className="w-24 text-muted-foreground text-sm shrink-0">
+                    Epic:
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-primary/5 border-primary/30 text-primary"
+                  >
+                    {task.epicName}
+                  </Badge>
+                </div>
+              )}
+
+              {task?.labels && task.labels.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="w-24 text-muted-foreground text-sm shrink-0">
+                    Labels:
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {task.labels.map((l) => (
+                      <Badge key={l} variant="secondary" className="text-xs">
+                        {l}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Tabs */}
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full"
+              >
                 <TabsList className="h-10 w-full justify-start bg-transparent border-b border-border rounded-none p-0 gap-1">
                   <TabsTrigger
                     value="description"
@@ -303,7 +393,9 @@ export function ViewTaskDialog({
                 <TabsContent value="description" className="mt-4 space-y-4">
                   {task?.parentTask && (
                     <div className="border rounded-md p-3 bg-muted/30">
-                      <div className="text-xs text-muted-foreground mb-1">Parent Task</div>
+                      <div className="text-xs text-muted-foreground mb-1">
+                        Parent Task
+                      </div>
                       <Button
                         variant="link"
                         className="h-auto p-0 font-medium text-primary"
@@ -320,7 +412,9 @@ export function ViewTaskDialog({
                       dangerouslySetInnerHTML={{ __html: task.description }}
                     />
                   ) : (
-                    <p className="text-sm text-muted-foreground">No description provided.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No description provided.
+                    </p>
                   )}
                 </TabsContent>
 
@@ -349,15 +443,75 @@ export function ViewTaskDialog({
                       </div>
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground text-center py-4">No comments yet.</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No comments yet.
+                  </p>
                 </TabsContent>
 
                 <TabsContent value="attachments" className="mt-4 space-y-4">
-                  <p className="text-sm text-muted-foreground text-center py-8">No attachments yet.</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No attachments yet.
+                  </p>
                 </TabsContent>
 
                 <TabsContent value="history" className="mt-4">
-                  <p className="text-sm text-muted-foreground text-center py-8">No history available.</p>
+                  {!activitiesLoaded ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Loading...
+                    </p>
+                  ) : activities.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No history available.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {activities.map((a) => {
+                        let description = a.type;
+                        try {
+                          const p = JSON.parse(a.payload);
+                          if (a.type === "created")
+                            description = `created this issue`;
+                          else if (a.type === "moved")
+                            description = `moved from "${p.from}" to "${p.to}"`;
+                          else if (a.type === "updated")
+                            description = `updated this issue`;
+                        } catch {}
+                        return (
+                          <div
+                            key={a.id}
+                            className="flex items-start gap-3 py-2 border-b border-border last:border-0"
+                          >
+                            <Avatar className="w-7 h-7 shrink-0">
+                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                {a.username.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium">
+                                {a.username}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {" "}
+                                {description}
+                              </span>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {new Date(a.created_at).toLocaleString(
+                                  undefined,
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>
@@ -386,9 +540,10 @@ export function ViewTaskDialog({
           trigger={<div />}
           task={{
             id: viewingSubtaskId,
-            parentTask: task?.id && task?.title
-              ? { id: task.id, title: task.title }
-              : undefined,
+            parentTask:
+              task?.id && task?.title
+                ? { id: task.id, title: task.title }
+                : undefined,
           }}
           open={true}
           onOpenChange={(isOpen) => {

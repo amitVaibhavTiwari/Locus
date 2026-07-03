@@ -7,6 +7,7 @@ import {
   getProjectIssues,
   getProjectBoard,
   getProjectMembers,
+  getActiveSprint,
 } from "@/lib/dal";
 import { ProjectBoardClient } from "./ProjectBoardClient";
 import type { Task } from "@/components/kanban/KanbanBoard";
@@ -30,13 +31,14 @@ export default async function ProjectBoardPage({
   const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
   if (!org || !user) redirect("/onboarding/workspace");
 
-  const [project, pinnedProjects, rawIssues, board, projectMembers] =
+  const [project, pinnedProjects, rawIssues, board, projectMembers, activeSprint] =
     await Promise.all([
       getProject(projectId, org.id, user.id),
       getPinnedProjects(user.id, org.id),
       getProjectIssues(projectId),
       getProjectBoard(projectId),
       getProjectMembers(projectId),
+      getActiveSprint(projectId),
     ]);
 
   if (!project) notFound();
@@ -72,6 +74,10 @@ export default async function ProjectBoardPage({
     reporterId: issue.reporter_id,
     type: issue.type,
     createdAt: issue.created_at,
+    labels: issue.labels,
+    sprintId: issue.sprint_id ?? null,
+    epicId: issue.epic_id ?? null,
+    epicName: issue.epic_name ?? null,
   }));
 
   const memberNames = projectMembers.map((m) => m.username);
@@ -84,6 +90,7 @@ export default async function ProjectBoardPage({
       initialIssues={initialIssues}
       boardColumns={boardColumns}
       memberNames={memberNames}
+      activeSprintId={activeSprint?.id ?? null}
     />
   );
 }

@@ -51,14 +51,6 @@ interface CreateTaskClientProps {
   defaultStatus: string;
 }
 
-const epics = [
-  { id: "1", name: "User Authentication System" },
-  { id: "2", name: "Payment Integration" },
-  { id: "3", name: "Dashboard Redesign" },
-  { id: "4", name: "Mobile App Development" },
-  { id: "5", name: "Performance Optimization" },
-];
-
 const predefinedLabels = [
   "Frontend", "Backend", "UI", "Bug", "Feature", "Documentation", "Testing", "Security", "Performance",
 ];
@@ -189,6 +181,7 @@ export function CreateTaskClient({
   const [taskTitle, setTaskTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("");
+  const [type, setType] = useState("task");
   const [status, setStatus] = useState(defaultStatus);
   const [assignee, setAssignee] = useState<Member | null>(null);
   const [reporter, setReporter] = useState<Member | null>(
@@ -198,9 +191,12 @@ export function CreateTaskClient({
   const [labels, setLabels] = useState<string[]>([]);
   const [customLabel, setCustomLabel] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [epic, setEpic] = useState("");
+  const [epic, setEpic] = useState<{ id: string; name: string } | null>(null);
   const [location, setLocation] = useState("sprint");
   const [epicOpen, setEpicOpen] = useState(false);
+  const [epicResults, setEpicResults] = useState<{ id: string; name: string }[]>([]);
+  const [epicLoading, setEpicLoading] = useState(false);
+  const epicTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,16 +206,24 @@ export function CreateTaskClient({
       return;
     }
 
+    const pendingLabel = customLabel.trim();
+    const finalLabels =
+      pendingLabel && !labels.includes(pendingLabel)
+        ? [...labels, pendingLabel]
+        : labels;
+
     const formData = new FormData();
     formData.set("project_id", projectId);
     formData.set("title", taskTitle.trim());
     formData.set("description", description);
     formData.set("status", status);
     formData.set("priority", priority || "medium");
-    formData.set("type", "task");
+    formData.set("type", type);
+    formData.set("labels", JSON.stringify(finalLabels));
     if (assignee) formData.set("assignee_id", assignee.id);
     if (reporter) formData.set("reporter_id", reporter.id);
     if (dueDate) formData.set("due_date", format(dueDate, "yyyy-MM-dd"));
+    if (epic) formData.set("epic_id", epic.id);
 
     startTransition(async () => {
       const result = await createIssue(undefined, formData);
@@ -233,6 +237,33 @@ export function CreateTaskClient({
       });
       router.push(`/project/${projectId}`);
     });
+  };
+
+  const handleEpicSearch = (q: string) => {
+    clearTimeout(epicTimer.current);
+    setEpicLoading(true);
+    epicTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/epics/search?projectId=${encodeURIComponent(projectId)}&q=${encodeURIComponent(q)}`,
+        );
+        const data: { id: string; name: string }[] = await res.json();
+        setEpicResults(data);
+      } finally {
+        setEpicLoading(false);
+      }
+    }, 300);
+  };
+
+  const handleEpicOpen = (next: boolean) => {
+    setEpicOpen(next);
+    if (next) {
+      setEpicLoading(true);
+      fetch(`/api/epics/search?projectId=${encodeURIComponent(projectId)}`)
+        .then((r) => r.json())
+        .then((data: { id: string; name: string }[]) => setEpicResults(data))
+        .finally(() => setEpicLoading(false));
+    }
   };
 
   const addLabel = (label: string) => {
@@ -290,7 +321,22 @@ export function CreateTaskClient({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="task">Task</SelectItem>
+                  <SelectItem value="story">Story</SelectItem>
+                  <SelectItem value="bug">Bug</SelectItem>
+                  <SelectItem value="subtask">Subtask</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label>Priority</Label>
               <Select value={priority} onValueChange={setPriority}>
@@ -390,30 +436,49 @@ export function CreateTaskClient({
 
             <div className="space-y-2">
               <Label>Epic</Label>
-              <Popover open={epicOpen} onOpenChange={setEpicOpen}>
+              <Popover open={epicOpen} onOpenChange={handleEpicOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
-                    {epic ? epics.find((e) => e.id === epic)?.name : (
+                    {epic ? (
+                      epic.name
+                    ) : (
                       <><Search className="w-4 h-4 mr-2" />Search epic...</>
                     )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[300px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search epic..." />
+                  <Command shouldFilter={false}>
+                    <CommandInput placeholder="Search epic..." onValueChange={handleEpicSearch} />
                     <CommandList>
-                      <CommandEmpty>No epic found.</CommandEmpty>
-                      <CommandGroup>
-                        {epics.map((epicItem) => (
-                          <CommandItem
-                            key={epicItem.id}
-                            value={epicItem.name}
-                            onSelect={() => { setEpic(epicItem.id); setEpicOpen(false); }}
-                          >
-                            {epicItem.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      {epicLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <>
+                          <CommandEmpty>No epics found.</CommandEmpty>
+                          <CommandGroup>
+                            {epic && (
+                              <CommandItem
+                                value="__clear__"
+                                onSelect={() => { setEpic(null); setEpicOpen(false); }}
+                                className="text-muted-foreground"
+                              >
+                                Clear selection
+                              </CommandItem>
+                            )}
+                            {epicResults.map((e) => (
+                              <CommandItem
+                                key={e.id}
+                                value={e.id}
+                                onSelect={() => { setEpic(e); setEpicOpen(false); }}
+                              >
+                                {e.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </>
+                      )}
                     </CommandList>
                   </Command>
                 </PopoverContent>
@@ -441,7 +506,7 @@ export function CreateTaskClient({
                 value={customLabel}
                 onChange={(e) => setCustomLabel(e.target.value)}
                 placeholder="Add custom label"
-                onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addCustomLabel())}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomLabel())}
               />
               <Button type="button" onClick={addCustomLabel} size="sm">Add</Button>
             </div>

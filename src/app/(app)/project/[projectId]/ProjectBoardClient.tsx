@@ -53,6 +53,7 @@ interface ProjectBoardClientProps {
   initialIssues: Task[];
   boardColumns: Array<{ id: string; title: string }>;
   memberNames: string[];
+  activeSprintId: string | null;
 }
 
 export function ProjectBoardClient({
@@ -62,6 +63,7 @@ export function ProjectBoardClient({
   initialIssues,
   boardColumns,
   memberNames,
+  activeSprintId,
 }: ProjectBoardClientProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -124,13 +126,18 @@ export function ProjectBoardClient({
   const uniqueReporters = memberNames;
 
   const filteredTasks = tasks.filter((task) => {
+    const matchesSprint =
+      sprintFilter === "all" ||
+      (sprintFilter === "current" && activeSprintId
+        ? task.sprintId === activeSprintId
+        : true);
     const matchesPriority =
       priorityFilter === "all" || task.priority === priorityFilter;
     const matchesAssignee =
       assigneeFilter === "all" || task.assignee?.name === assigneeFilter;
     const matchesReporter =
       reporterFilter === "all" || task.reporter?.name === reporterFilter;
-    return matchesPriority && matchesAssignee && matchesReporter;
+    return matchesSprint && matchesPriority && matchesAssignee && matchesReporter;
   });
 
   const viewTabs = [
@@ -163,9 +170,13 @@ export function ProjectBoardClient({
                   <Users className="w-4 h-4 mr-2" />
                   Team Members
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push(`/backlog`)}>
+                <DropdownMenuItem onClick={() => router.push(`/backlog?projectId=${projectId}`)}>
                   <List className="w-4 h-4 mr-2" />
                   Backlog
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(`/project/${projectId}/sprints`)}>
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Sprints
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => router.push(`/project/${projectId}/settings`)}

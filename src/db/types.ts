@@ -152,10 +152,42 @@ export interface LabelsTable {
   created_at: string;
 }
 
+export interface EpicsTable {
+  id: string;
+  project_id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  priority: string;
+  status: string;
+  owner_id: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SprintsTable {
+  id: string;
+  project_id: string;
+  organization_id: string;
+  name: string;
+  goal: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: "planned" | "active" | "completed";
+  velocity: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface IssuesTable {
   id: string;
   organization_id: string;
   project_id: string;
+  sprint_id: string | null;
+  epic_id: string | null;
   board_id: string | null;
   column_id: string | null;
   parent_issue_id: string | null;
@@ -206,6 +238,8 @@ export interface Database {
   boards: BoardsTable;
   columns: ColumnsTable;
   labels: LabelsTable;
+  epics: EpicsTable;
+  sprints: SprintsTable;
   issues: IssuesTable;
   issue_labels: IssueLabelsTable;
   activities: ActivitiesTable;

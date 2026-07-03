@@ -41,6 +41,9 @@ export interface Task {
   issueNumber?: number;
   assigneeId?: string | null;
   reporterId?: string | null;
+  sprintId?: string | null;
+  epicId?: string | null;
+  epicName?: string | null;
   type?: "task" | "story" | "bug" | "subtask";
   createdAt?: string;
 }
