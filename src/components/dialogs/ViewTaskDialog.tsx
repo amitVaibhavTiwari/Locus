@@ -8,6 +8,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +54,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { moveIssue } from "@/actions/issues";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { cleanFilename } from "@/lib/utils";
 
 type TaskPriority = "highest" | "high" | "medium" | "low" | "none";
 
@@ -131,13 +142,14 @@ export function ViewTaskDialog({
   const [viewingSubtaskId, setViewingSubtaskId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [activitiesLoaded, setActivitiesLoaded] = useState(false);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<{ id: string; filename: string } | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [showCommentBox, setShowCommentBox] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -152,9 +164,7 @@ export function ViewTaskDialog({
     if (!open || !issueId) return;
     setTaskLoading(true);
     setTaskData(null);
-    setActivitiesLoaded(false);
     setAttachmentsLoaded(false);
-    setCommentsLoaded(false);
     setActivities([]);
     setAttachments([]);
     setComments([]);
@@ -175,15 +185,14 @@ export function ViewTaskDialog({
   }, [open, issueId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (activeTab !== "history" || !issueId || activitiesLoaded) return;
+    if (activeTab !== "history" || !issueId) return;
+    setActivitiesLoading(true);
     fetch(`/api/issues/${issueId}/activities`)
       .then((r) => r.json())
-      .then((data: Activity[]) => {
-        setActivities(data);
-        setActivitiesLoaded(true);
-      })
-      .catch(() => setActivitiesLoaded(true));
-  }, [activeTab, issueId, activitiesLoaded]);
+      .then((data: Activity[]) => setActivities(data))
+      .catch(() => {})
+      .finally(() => setActivitiesLoading(false));
+  }, [activeTab, issueId]);
 
   useEffect(() => {
     if (activeTab !== "attachments" || !issueId || attachmentsLoaded) return;
@@ -197,16 +206,17 @@ export function ViewTaskDialog({
   }, [activeTab, issueId, attachmentsLoaded]);
 
   useEffect(() => {
-    if (activeTab !== "comments" || !issueId || commentsLoaded) return;
+    if (activeTab !== "comments" || !issueId) return;
+    setCommentsLoading(true);
     fetch(`/api/issues/${issueId}/comments`)
       .then((r) => r.json())
       .then((data: { comments: Comment[]; currentUsername: string | null }) => {
         setComments(data.comments ?? []);
         setCurrentUsername(data.currentUsername);
-        setCommentsLoaded(true);
       })
-      .catch(() => setCommentsLoaded(true));
-  }, [activeTab, issueId, commentsLoaded]);
+      .catch(() => {})
+      .finally(() => setCommentsLoading(false));
+  }, [activeTab, issueId]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -239,6 +249,7 @@ export function ViewTaskDialog({
   };
 
   const handleDeleteAttachment = async (attachmentId: string) => {
+    setConfirmDeleteAttachment(null);
     setDeletingId(attachmentId);
     try {
       const res = await fetch(
@@ -541,12 +552,7 @@ export function ViewTaskDialog({
                     <div className="w-24 text-muted-foreground text-sm shrink-0">
                       Epic:
                     </div>
-                    <Badge
-                      variant="outline"
-                      className="text-xs bg-primary/5 border-primary/30 text-primary"
-                    >
-                      {taskData.epic_name}
-                    </Badge>
+                    <span className="text-sm font-semibold">{taskData.epic_name}</span>
                   </div>
                 )}
 
@@ -632,7 +638,7 @@ export function ViewTaskDialog({
                   </TabsContent>
 
                   <TabsContent value="comments" className="mt-4 space-y-4">
-                    {!commentsLoaded ? (
+                    {commentsLoading ? (
                       <div className="space-y-4">
                         {Array.from({ length: 3 }).map((_, i) => (
                           <div key={i} className="flex gap-3">
@@ -852,7 +858,7 @@ export function ViewTaskDialog({
                                   rel="noopener noreferrer"
                                   className="text-sm font-medium text-foreground hover:underline truncate block"
                                 >
-                                  {att.filename}
+                                  {cleanFilename(att.filename)}
                                 </a>
                                 <p className="text-xs text-muted-foreground">
                                   {sizeLabel} · {att.uploader_name} ·{" "}
@@ -870,7 +876,7 @@ export function ViewTaskDialog({
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDeleteAttachment(att.id)}
+                                onClick={() => setConfirmDeleteAttachment({ id: att.id, filename: att.filename })}
                                 disabled={deletingId === att.id}
                               >
                                 {deletingId === att.id ? (
@@ -887,7 +893,7 @@ export function ViewTaskDialog({
                   </TabsContent>
 
                   <TabsContent value="history" className="mt-4">
-                    {!activitiesLoaded ? (
+                    {activitiesLoading ? (
                       <div className="space-y-1">
                         {Array.from({ length: 5 }).map((_, i) => (
                           <div
@@ -918,6 +924,10 @@ export function ViewTaskDialog({
                               description = `moved from "${p.from}" to "${p.to}"`;
                             else if (a.type === "updated")
                               description = `updated this issue`;
+                            else if (a.type === "attachment_added")
+                              description = `attached "${cleanFilename(p.filename)}"`;
+                            else if (a.type === "attachment_removed")
+                              description = `removed attachment "${cleanFilename(p.filename)}"`;
                           } catch {}
                           return (
                             <div
@@ -984,6 +994,29 @@ export function ViewTaskDialog({
           }}
         />
       )}
+
+      <AlertDialog
+        open={!!confirmDeleteAttachment}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteAttachment(null); }}
+      >
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete attachment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{confirmDeleteAttachment ? cleanFilename(confirmDeleteAttachment.filename) : ""}&rdquo; will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDeleteAttachment && handleDeleteAttachment(confirmDeleteAttachment.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
+import { after } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getSignedDownloadUrl, deleteFile } from "@/lib/storage";
@@ -92,7 +94,7 @@ export async function DELETE(
     .selectFrom("attachments")
     .where("id", "=", attachmentId)
     .where("issue_id", "=", issueId)
-    .select(["storage_key", "organization_id", "uploaded_by"])
+    .select(["storage_key", "organization_id", "uploaded_by", "filename"])
     .executeTakeFirst();
 
   if (!attachment) {
@@ -123,8 +125,31 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const issue = await db
+    .selectFrom("issues")
+    .where("id", "=", issueId)
+    .select("project_id")
+    .executeTakeFirst();
+
   await deleteFile(attachment.storage_key);
   await db.deleteFrom("attachments").where("id", "=", attachmentId).execute();
+
+  after(async () => {
+    if (!issue) return;
+    await db
+      .insertInto("activities")
+      .values({
+        id: randomUUID(),
+        organization_id: attachment.organization_id,
+        project_id: issue.project_id,
+        issue_id: issueId,
+        user_id: session.user.id,
+        type: "attachment_removed",
+        payload: JSON.stringify({ filename: attachment.filename }),
+        created_at: new Date().toISOString(),
+      })
+      .execute();
+  });
 
   return new NextResponse(null, { status: 204 });
 }

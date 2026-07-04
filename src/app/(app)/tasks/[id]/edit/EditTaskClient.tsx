@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useTransition, useRef, useCallback } from "react";
+import React, { useState, useTransition, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, X, Paperclip, Upload, Search, ArrowLeft, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { RichTextEditor, type RichTextEditorRef } from "@/components/editor/RichTextEditor";
+import { CalendarIcon, X, Search, ArrowLeft, Loader2, Upload, FileText, Paperclip, Trash2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { RichTextEditor, RichTextEditorRef } from "@/components/editor/RichTextEditor";
 import { cn, cleanFilename } from "@/lib/utils";
 import {
   Command,
@@ -28,11 +28,31 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { createIssue } from "@/actions/issues";
+import { updateIssue } from "@/actions/issues";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface BoardStatus {
   key: string;
   name: string;
+}
+
+interface ExistingAttachment {
+  id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+  created_at: string;
+  uploader_name: string;
+  url: string;
 }
 
 interface Member {
@@ -48,14 +68,29 @@ interface Sprint {
   status: string;
 }
 
-interface CreateTaskClientProps {
+interface IssueData {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  type: string;
+  dueDate: string | null;
+  editPermission: "anyone" | "assignee_only" | "reporter_only";
+  sprintId: string | null;
+  labels: string[];
+  epic: { id: string; name: string } | null;
+  assignee: Member | null;
+  reporter: Member;
+}
+
+interface EditTaskClientProps {
+  issue: IssueData;
   projectId: string;
   projectName: string;
   statuses: BoardStatus[];
   sprints: Sprint[];
   initialMembers: Member[];
-  currentUserId: string;
-  defaultStatus: string;
 }
 
 const predefinedLabels = [
@@ -144,6 +179,15 @@ function MemberPicker({
               <>
                 <CommandEmpty>No person found.</CommandEmpty>
                 <CommandGroup>
+                  {selected && (
+                    <CommandItem
+                      value="__clear__"
+                      onSelect={() => { onSelect(null); setOpen(false); }}
+                      className="text-muted-foreground"
+                    >
+                      Clear selection
+                    </CommandItem>
+                  )}
                   {results.map((member) => (
                     <CommandItem
                       key={member.id}
@@ -173,43 +217,48 @@ function MemberPicker({
   );
 }
 
-export function CreateTaskClient({
+export function EditTaskClient({
+  issue,
   projectId,
   projectName,
   statuses,
   sprints,
   initialMembers,
-  currentUserId,
-  defaultStatus,
-}: CreateTaskClientProps) {
+}: EditTaskClientProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const editorRef = useRef<RichTextEditorRef>(null);
 
-  const [taskTitle, setTaskTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("");
-  const [type, setType] = useState("task");
-  const [status, setStatus] = useState(defaultStatus);
-  const [assignee, setAssignee] = useState<Member | null>(null);
-  const [reporter, setReporter] = useState<Member | null>(
-    initialMembers.find((m) => m.id === currentUserId) ?? initialMembers[0] ?? null,
+  const [taskTitle, setTaskTitle] = useState(issue.title);
+  const [description, setDescription] = useState(issue.description);
+  const [priority, setPriority] = useState(issue.priority);
+  const [assignee, setAssignee] = useState<Member | null>(issue.assignee);
+  const [dueDate, setDueDate] = useState<Date | undefined>(
+    issue.dueDate ? parseISO(issue.dueDate) : undefined,
   );
-  const [dueDate, setDueDate] = useState<Date>();
-  const [labels, setLabels] = useState<string[]>([]);
+  const [labels, setLabels] = useState<string[]>(issue.labels);
   const [customLabel, setCustomLabel] = useState("");
-  const [attachments, setAttachments] = useState<File[]>([]);
-  const [epic, setEpic] = useState<{ id: string; name: string } | null>(null);
-  // Default to the active sprint if one exists, otherwise backlog (null)
-  const [sprintId, setSprintId] = useState<string | null>(
-    sprints.find((s) => s.status === "active")?.id ?? null,
+  const [epic, setEpic] = useState<{ id: string; name: string } | null>(issue.epic);
+  const [editPermission, setEditPermission] = useState<"anyone" | "assignee_only" | "reporter_only">(
+    issue.editPermission,
   );
-  const [editPermission, setEditPermission] = useState<"anyone" | "assignee_only" | "reporter_only">("anyone");
+  const [existingAttachments, setExistingAttachments] = useState<ExistingAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(true);
+  const [newAttachments, setNewAttachments] = useState<File[]>([]);
+  const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<{ id: string; filename: string } | null>(null);
   const [epicOpen, setEpicOpen] = useState(false);
   const [epicResults, setEpicResults] = useState<{ id: string; name: string }[]>([]);
   const [epicLoading, setEpicLoading] = useState(false);
   const epicTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const editorRef = useRef<RichTextEditorRef>(null);
+
+  useEffect(() => {
+    fetch(`/api/attachments/${issue.id}`)
+      .then((r) => r.json())
+      .then((data: ExistingAttachment[]) => setExistingAttachments(data))
+      .catch(() => {})
+      .finally(() => setAttachmentsLoading(false));
+  }, [issue.id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,55 +275,46 @@ export function CreateTaskClient({
         : labels;
 
     startTransition(async () => {
-      let finalDescription = description;
-      try {
-        if (editorRef.current) finalDescription = await editorRef.current.flush();
-      } catch {
-        toast({ title: "Image upload failed", description: "Could not upload one or more pasted images.", variant: "destructive" });
-        return;
-      }
+      const finalDescription = editorRef.current ? await editorRef.current.flush() : description;
 
       const formData = new FormData();
-      formData.set("project_id", projectId);
+      formData.set("issue_id", issue.id);
       formData.set("title", taskTitle.trim());
       formData.set("description", finalDescription);
-      formData.set("status", status);
       formData.set("priority", priority || "medium");
-      formData.set("type", type);
       formData.set("labels", JSON.stringify(finalLabels));
+      formData.set("edit_permission", editPermission);
       if (assignee) formData.set("assignee_id", assignee.id);
-      if (reporter) formData.set("reporter_id", reporter.id);
       if (dueDate) formData.set("due_date", format(dueDate, "yyyy-MM-dd"));
       if (epic) formData.set("epic_id", epic.id);
-      if (sprintId) formData.set("sprint_id", sprintId);
-      formData.set("edit_permission", editPermission);
 
-      const result = await createIssue(undefined, formData);
+      const result = await updateIssue(undefined, formData);
       if (result?.error) {
         toast({ title: "Error", description: result.error, variant: "destructive" });
         return;
       }
 
-      if (result?.issueId && attachments.length > 0) {
+      if (newAttachments.length > 0) {
         const failed: string[] = [];
         await Promise.all(
-          attachments.map(async (file) => {
+          newAttachments.map(async (file) => {
             const body = new FormData();
             body.append("file", file);
-            body.append("issueId", result.issueId!);
+            body.append("issueId", issue.id);
             const res = await fetch("/api/upload", { method: "POST", body });
             if (!res.ok) failed.push(file.name);
           }),
         );
         if (failed.length > 0) {
-          toast({ title: "Some attachments failed to upload", description: failed.join(", "), variant: "destructive" });
+          toast({
+            title: "Some attachments failed to upload",
+            description: failed.join(", "),
+            variant: "destructive",
+          });
         }
       }
 
-      const locationLabel = sprintId
-        ? (sprints.find((s) => s.id === sprintId)?.name ?? "sprint")
-        : "backlog";
-      toast({ title: "Task created", description: `Added to ${locationLabel}` });
+      toast({ title: "Task updated" });
       router.push(`/project/${projectId}`);
     });
   };
@@ -313,11 +353,32 @@ export function CreateTaskClient({
   const addCustomLabel = () => {
     if (customLabel.trim()) { addLabel(customLabel.trim()); setCustomLabel(""); }
   };
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAttachments((prev) => [...prev, ...Array.from(e.target.files || [])]);
+
+  const handleDeleteExisting = async (attachmentId: string) => {
+    setConfirmDeleteAttachment(null);
+    const res = await fetch(`/api/attachments/${issue.id}?attachmentId=${attachmentId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+    } else {
+      toast({ title: "Failed to delete attachment", variant: "destructive" });
+    }
   };
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewAttachments((prev) => [...prev, ...Array.from(e.target.files || [])]);
+    e.target.value = "";
+  };
+
+  const removeNewAttachment = (index: number) => {
+    setNewAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   return (
@@ -333,7 +394,7 @@ export function CreateTaskClient({
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Create New Task</h1>
+            <h1 className="text-3xl font-bold">Edit Task</h1>
             <p className="text-muted-foreground mt-2">
               Project: <span className="font-semibold">{projectName}</span>
             </p>
@@ -353,32 +414,17 @@ export function CreateTaskClient({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description *</Label>
+            <Label htmlFor="description">Description</Label>
             <RichTextEditor
               ref={editorRef}
               content={description}
               onChange={setDescription}
-              placeholder="Describe the task in detail with formatting, lists, links, images and more..."
+              placeholder="Describe the task in detail..."
               projectId={projectId}
             />
           </div>
 
-          <div className="grid grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="task">Task</SelectItem>
-                  <SelectItem value="story">Story</SelectItem>
-                  <SelectItem value="bug">Bug</SelectItem>
-                  <SelectItem value="subtask">Subtask</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Priority</Label>
               <Select value={priority} onValueChange={setPriority}>
@@ -396,40 +442,15 @@ export function CreateTaskClient({
             </div>
 
             <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={setStatus}>
+              <Label>Who can edit</Label>
+              <Select value={editPermission} onValueChange={(v) => setEditPermission(v as typeof editPermission)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s.key} value={s.key}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Location</Label>
-              <Select
-                value={sprintId ?? "__backlog__"}
-                onValueChange={(v) => setSprintId(v === "__backlog__" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__backlog__">Backlog</SelectItem>
-                  {sprints.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                      {s.status === "active" && (
-                        <span className="ml-1 text-xs text-muted-foreground">(active)</span>
-                      )}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="anyone">Anyone in project</SelectItem>
+                  <SelectItem value="assignee_only">Assignee only</SelectItem>
+                  <SelectItem value="reporter_only">Reporter only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -450,21 +471,21 @@ export function CreateTaskClient({
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 Reporter
-                <span className="text-xs font-normal text-muted-foreground">
-                  (cannot be edited once task is created)
-                </span>
+                <span className="text-xs font-normal text-muted-foreground">(cannot be edited)</span>
               </Label>
-              <MemberPicker
-                projectId={projectId}
-                initialMembers={initialMembers}
-                selected={reporter}
-                onSelect={setReporter}
-                placeholder="Search reporter..."
-              />
+              <Button variant="outline" className="w-full justify-start opacity-60 cursor-not-allowed" disabled>
+                <div className="flex items-center gap-2">
+                  <Avatar className="w-5 h-5">
+                    <AvatarImage src={issue.reporter.avatar_url ?? undefined} />
+                    <AvatarFallback className="text-xs">{getInitials(issue.reporter.username)}</AvatarFallback>
+                  </Avatar>
+                  {issue.reporter.username}
+                </div>
+              </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Due Date</Label>
               <Popover>
@@ -484,20 +505,6 @@ export function CreateTaskClient({
                   />
                 </PopoverContent>
               </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Who can edit</Label>
-              <Select value={editPermission} onValueChange={(v) => setEditPermission(v as typeof editPermission)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anyone">Anyone in project</SelectItem>
-                  <SelectItem value="assignee_only">Assignee only</SelectItem>
-                  <SelectItem value="reporter_only">Reporter only</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2">
@@ -589,25 +596,75 @@ export function CreateTaskClient({
           </div>
 
           <div className="space-y-3">
-            <Label>Attachments</Label>
+            <Label className="flex items-center gap-2">
+              <Paperclip className="w-4 h-4" />
+              Attachments
+            </Label>
+
+            {attachmentsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading attachments...
+              </div>
+            ) : existingAttachments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {existingAttachments.map((file) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-3 p-3 border border-border rounded-md hover:bg-muted/40"
+                  >
+                    <div className="w-9 h-9 rounded-sm bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 min-w-0"
+                    >
+                      <p className="text-sm font-medium truncate hover:underline">{cleanFilename(file.filename)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatBytes(file.size)} · {file.uploader_name}
+                      </p>
+                    </a>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setConfirmDeleteAttachment({ id: file.id, filename: file.filename })}
+                    >
+                      <Trash2 className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
             <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-              <input type="file" id="file-upload" className="hidden" multiple onChange={handleFileChange} />
-              <label htmlFor="file-upload" className="cursor-pointer">
+              <input
+                type="file"
+                id="file-upload-edit"
+                className="hidden"
+                multiple
+                onChange={handleFileChange}
+              />
+              <label htmlFor="file-upload-edit" className="cursor-pointer">
                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">Click to upload or drag and drop</p>
-                <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPG, GIF up to 10MB</p>
+                <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPG, GIF up to 50MB</p>
               </label>
             </div>
-            {attachments.length > 0 && (
+
+            {newAttachments.length > 0 && (
               <div className="space-y-2">
-                {attachments.map((file, index) => (
+                {newAttachments.map((file, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
                     <div className="flex items-center gap-2">
-                      <Paperclip className="w-4 h-4" />
-                      <span className="text-sm">{cleanFilename(file.name)}</span>
-                      <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(2)} KB)</span>
+                      <Paperclip className="w-4 h-4 shrink-0" />
+                      <span className="text-sm truncate">{cleanFilename(file.name)}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">({formatBytes(file.size)})</span>
                     </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeAttachment(index)}>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeNewAttachment(index)}>
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
@@ -621,11 +678,34 @@ export function CreateTaskClient({
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Creating..." : "Create Task"}
+              {isPending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>
       </div>
+
+      <AlertDialog
+        open={!!confirmDeleteAttachment}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteAttachment(null); }}
+      >
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete attachment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{confirmDeleteAttachment ? cleanFilename(confirmDeleteAttachment.filename) : ""}&rdquo; will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDeleteAttachment && handleDeleteExisting(confirmDeleteAttachment.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

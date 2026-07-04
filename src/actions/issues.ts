@@ -102,6 +102,11 @@ export async function createIssue(
   const labelNames: string[] = labelsJson ? JSON.parse(labelsJson) : [];
   const epicId = formData.get("epic_id")?.toString() || null;
   const sprintId = formData.get("sprint_id")?.toString() || null;
+  const editPermission =
+    (formData.get("edit_permission")?.toString() as
+      | "anyone"
+      | "assignee_only"
+      | "reporter_only") || "anyone";
 
   const project = await db
     .selectFrom("projects")
@@ -150,6 +155,7 @@ export async function createIssue(
       assignee_id: assigneeId || null,
       due_date: dueDate,
       completed_at: completedAt,
+      edit_permission: editPermission,
       created_at: now,
       updated_at: now,
     })
@@ -270,13 +276,70 @@ export async function updateIssue(
   const priority = formData.get("priority")?.toString() || "medium";
   const assigneeId = formData.get("assignee_id")?.toString() || null;
   const dueDate = formData.get("due_date")?.toString() || null;
+  const epicId = formData.get("epic_id")?.toString() || null;
+  const editPermission = formData.get("edit_permission")?.toString() as
+    | "anyone"
+    | "assignee_only"
+    | "reporter_only"
+    | undefined;
+  const labelsJson = formData.get("labels")?.toString();
+  const labelNames: string[] = labelsJson ? JSON.parse(labelsJson) : [];
 
   const issue = await db
     .selectFrom("issues")
     .where("id", "=", issueId)
-    .select(["project_id", "organization_id"])
+    .select([
+      "project_id",
+      "organization_id",
+      "reporter_id",
+      "assignee_id",
+      "edit_permission",
+      "title",
+      "description",
+      "priority",
+      "due_date",
+      "epic_id",
+    ])
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
+
+  // Permission check
+  if (
+    issue.edit_permission === "assignee_only" &&
+    issue.assignee_id !== session.user.id
+  ) {
+    return { error: "Only the assignee can edit this issue" };
+  }
+  if (
+    issue.edit_permission === "reporter_only" &&
+    issue.reporter_id !== session.user.id
+  ) {
+    return { error: "Only the reporter can edit this issue" };
+  }
+
+  // Track what actually changed for the history entry
+  const changes: { field: string; from: string | null; to: string | null }[] =
+    [];
+  if (issue.title !== title)
+    changes.push({ field: "title", from: issue.title, to: title });
+  if (issue.priority !== priority)
+    changes.push({ field: "priority", from: issue.priority, to: priority });
+  if ((issue.assignee_id ?? null) !== (assigneeId ?? null))
+    changes.push({
+      field: "assignee",
+      from: issue.assignee_id,
+      to: assigneeId,
+    });
+  if ((issue.due_date ?? null) !== (dueDate ?? null))
+    changes.push({ field: "due_date", from: issue.due_date, to: dueDate });
+  if ((issue.epic_id ?? null) !== (epicId ?? null))
+    changes.push({ field: "epic", from: issue.epic_id, to: epicId });
+  if (editPermission && issue.edit_permission !== editPermission)
+    changes.push({
+      field: "edit_permission",
+      from: issue.edit_permission,
+      to: editPermission,
+    });
 
   const now = new Date().toISOString();
   await db
@@ -287,12 +350,35 @@ export async function updateIssue(
       priority,
       assignee_id: assigneeId || null,
       due_date: dueDate,
+      epic_id: epicId || null,
+      ...(editPermission ? { edit_permission: editPermission } : {}),
       updated_at: now,
     })
     .where("id", "=", issueId)
     .execute();
 
+  // Replace labels atomically
+  await db.deleteFrom("issue_labels").where("issue_id", "=", issueId).execute();
+  if (labelNames.length > 0) {
+    const labelIds = await Promise.all(
+      labelNames.map((name) =>
+        ensureLabel(issue.organization_id, issue.project_id, name),
+      ),
+    );
+    await db
+      .insertInto("issue_labels")
+      .values(
+        labelIds.map((labelId) => ({
+          id: randomUUID(),
+          issue_id: issueId,
+          label_id: labelId,
+        })),
+      )
+      .execute();
+  }
+
   after(async () => {
+    if (changes.length === 0) return;
     await db
       .insertInto("activities")
       .values({
@@ -302,7 +388,7 @@ export async function updateIssue(
         issue_id: issueId,
         user_id: session.user.id,
         type: "updated",
-        payload: JSON.stringify({ title }),
+        payload: JSON.stringify({ changes }),
         created_at: new Date().toISOString(),
       })
       .execute();

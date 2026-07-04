@@ -31,6 +31,8 @@ export async function GET(
       "issues.parent_issue_id",
       "issues.board_id",
       "issues.organization_id",
+      "issues.project_id",
+      "issues.edit_permission",
     ])
     .executeTakeFirst();
 
@@ -55,13 +57,13 @@ export async function GET(
         ? db
             .selectFrom("users")
             .where("id", "=", issue.assignee_id)
-            .select(["username"])
+            .select(["id", "username", "email", "avatar_url"])
             .executeTakeFirst()
         : Promise.resolve(null),
       db
         .selectFrom("users")
         .where("id", "=", issue.reporter_id)
-        .select(["username"])
+        .select(["id", "username", "email", "avatar_url"])
         .executeTakeFirst(),
       db
         .selectFrom("issue_labels")
@@ -109,14 +111,29 @@ export async function GET(
     issue_number: issue.issue_number,
     created_at: issue.created_at,
     due_date: issue.due_date,
+    project_id: issue.project_id,
+    edit_permission: issue.edit_permission,
     assignee: assignee
-      ? { name: assignee.username, initials: initials(assignee.username) }
+      ? {
+          id: assignee.id,
+          name: assignee.username,
+          initials: initials(assignee.username),
+          email: assignee.email,
+          avatar_url: assignee.avatar_url,
+        }
       : null,
     reporter: reporter
-      ? { name: reporter.username, initials: initials(reporter.username) }
+      ? {
+          id: reporter.id,
+          name: reporter.username,
+          initials: initials(reporter.username),
+          email: reporter.email,
+          avatar_url: reporter.avatar_url,
+        }
       : null,
     labels: labelRows.map((l) => l.name),
     epic_name: epic?.name ?? null,
+    epic_id: issue.epic_id,
     parentTask: parentIssue
       ? { id: parentIssue.id, title: parentIssue.title }
       : null,

@@ -150,11 +150,11 @@ export function AppSidebar({
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <div className="w-8 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
                 <KanbanSquare className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="font-bold text-lg text-foreground">
+                <h1 className="font-bold text-base text-foreground">
                   {workspaceName}
                 </h1>
                 <p className="text-xs text-muted-foreground">Workspace</p>

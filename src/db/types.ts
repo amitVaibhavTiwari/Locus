@@ -201,6 +201,7 @@ export interface IssuesTable {
   assignee_id: string | null;
   due_date: string | null;
   completed_at: string | null;
+  edit_permission: "anyone" | "assignee_only" | "reporter_only";
   created_at: string;
   updated_at: string;
 }

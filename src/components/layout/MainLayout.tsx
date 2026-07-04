@@ -65,7 +65,7 @@ function AppContent({
       style={{ paddingLeft: open ? "var(--sidebar-width)" : "0" }}
       className="flex flex-col min-h-svh w-full bg-background transition-[padding-left] duration-200 ease-linear"
     >
-      <header className="h-16 border-b border-border bg-surface/50 backdrop-blur-sm sticky top-0 z-40">
+      <header className="h-[4.6rem] border-b border-border bg-surface/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="flex items-center justify-between h-full px-6">
           <div className="flex items-center gap-4">
             <SidebarTrigger className="hover:bg-secondary" />

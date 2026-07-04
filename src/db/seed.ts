@@ -277,6 +277,7 @@ async function main() {
         assignee_id: userId,
         due_date: null,
         completed_at: null,
+        edit_permission: "anyone",
         created_at: now,
         updated_at: now,
       })

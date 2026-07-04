@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { after } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
@@ -106,6 +107,22 @@ export async function POST(req: NextRequest) {
       .execute();
 
     const signedUrl = await getSignedDownloadUrl(storageKey);
+
+    after(async () => {
+      await db
+        .insertInto("activities")
+        .values({
+          id: randomUUID(),
+          organization_id: issue.organization_id,
+          project_id: issue.project_id,
+          issue_id: issueId,
+          user_id: session.user.id,
+          type: "attachment_added",
+          payload: JSON.stringify({ filename }),
+          created_at: new Date().toISOString(),
+        })
+        .execute();
+    });
 
     return NextResponse.json(
       {
