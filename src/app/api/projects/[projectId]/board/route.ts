@@ -187,6 +187,7 @@ export async function GET(
     .selectFrom("issues")
     .where("issues.project_id", "=", projectId)
     .where("issues.parent_issue_id", "is", null)
+    .where("issues.archived", "=", 0)
     .$if(sprintFilter === "current" && !!activeSprintId, (q) =>
       q.where("issues.sprint_id", "=", activeSprintId),
     )

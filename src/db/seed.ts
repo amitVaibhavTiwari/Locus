@@ -278,6 +278,8 @@ async function main() {
         due_date: null,
         completed_at: null,
         edit_permission: "anyone",
+        archived: 0,
+        archived_at: null,
         created_at: now,
         updated_at: now,
       })

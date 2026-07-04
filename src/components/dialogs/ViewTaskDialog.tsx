@@ -52,9 +52,11 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { moveIssue } from "@/actions/issues";
+import { moveIssue, archiveIssue } from "@/actions/issues";
 import { formatDate, formatDateTime } from "@/lib/date";
 import { cleanFilename } from "@/lib/utils";
+import { Archive } from "lucide-react";
+import { useProjectRoleStore } from "@/stores/projectRoleStore";
 
 type TaskPriority = "highest" | "high" | "medium" | "low" | "none";
 
@@ -67,6 +69,7 @@ interface TaskData {
   issue_number: number;
   created_at: string;
   due_date: string | null;
+  project_id: string;
   assignee: { name: string; initials: string } | null;
   reporter: { name: string; initials: string } | null;
   labels: string[];
@@ -133,6 +136,9 @@ export function ViewTaskDialog({
   const setOpen =
     externalOnOpenChange !== undefined ? externalOnOpenChange : setInternalOpen;
 
+  const [isManager, setIsManager] = useState(false);
+  const { getRole } = useProjectRoleStore();
+
   const [taskData, setTaskData] = useState<TaskData | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("description");
@@ -147,7 +153,11 @@ export function ViewTaskDialog({
   const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<{ id: string; filename: string } | null>(null);
+  const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<{
+    id: string;
+    filename: string;
+  } | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
@@ -177,6 +187,9 @@ export function ViewTaskDialog({
       .then((data: TaskData) => {
         setTaskData(data);
         setStatus(data.status ?? "todo");
+        getRole(data.project_id).then((role) =>
+          setIsManager(role === "manager"),
+        );
       })
       .catch(() => {
         toast({ title: "Failed to load task", variant: "destructive" });
@@ -397,6 +410,17 @@ export function ViewTaskDialog({
                       Edit
                     </Button>
                   )}
+                  {!taskLoading && isManager && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => setConfirmArchive(true)}
+                    >
+                      <Archive className="w-4 h-4 mr-1" />
+                      Archive
+                    </Button>
+                  )}
                 </div>
                 {taskLoading ? (
                   <Skeleton className="h-8 w-80" />
@@ -552,7 +576,9 @@ export function ViewTaskDialog({
                     <div className="w-24 text-muted-foreground text-sm shrink-0">
                       Epic:
                     </div>
-                    <span className="text-sm font-semibold">{taskData.epic_name}</span>
+                    <span className="text-sm font-semibold">
+                      {taskData.epic_name}
+                    </span>
                   </div>
                 )}
 
@@ -876,7 +902,12 @@ export function ViewTaskDialog({
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                                onClick={() => setConfirmDeleteAttachment({ id: att.id, filename: att.filename })}
+                                onClick={() =>
+                                  setConfirmDeleteAttachment({
+                                    id: att.id,
+                                    filename: att.filename,
+                                  })
+                                }
                                 disabled={deletingId === att.id}
                               >
                                 {deletingId === att.id ? (
@@ -997,22 +1028,67 @@ export function ViewTaskDialog({
 
       <AlertDialog
         open={!!confirmDeleteAttachment}
-        onOpenChange={(open) => { if (!open) setConfirmDeleteAttachment(null); }}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteAttachment(null);
+        }}
       >
         <AlertDialogContent className="sm:max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete attachment?</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{confirmDeleteAttachment ? cleanFilename(confirmDeleteAttachment.filename) : ""}&rdquo; will be permanently deleted.
+              &ldquo;
+              {confirmDeleteAttachment
+                ? cleanFilename(confirmDeleteAttachment.filename)
+                : ""}
+              &rdquo; will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => confirmDeleteAttachment && handleDeleteAttachment(confirmDeleteAttachment.id)}
+              onClick={() =>
+                confirmDeleteAttachment &&
+                handleDeleteAttachment(confirmDeleteAttachment.id)
+              }
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The task will be removed from the board and backlog. You can view
+              it in the project&apos;s Archived section.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmArchive(false);
+                startTransition(async () => {
+                  const result = await archiveIssue(issueId);
+                  if (result?.error) {
+                    toast({
+                      title: "Error",
+                      description: result.error,
+                      variant: "destructive",
+                    });
+                  } else {
+                    toast({ title: "Task archived" });
+                    setOpen(false);
+                    router.refresh();
+                  }
+                });
+              }}
+            >
+              Archive
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

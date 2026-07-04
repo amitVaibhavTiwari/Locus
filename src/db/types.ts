@@ -163,6 +163,8 @@ export interface EpicsTable {
   owner_id: string | null;
   start_date: string | null;
   end_date: string | null;
+  archived: number;
+  archived_at: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -202,6 +204,8 @@ export interface IssuesTable {
   due_date: string | null;
   completed_at: string | null;
   edit_permission: "anyone" | "assignee_only" | "reporter_only";
+  archived: number;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }

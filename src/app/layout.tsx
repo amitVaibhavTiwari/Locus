@@ -5,6 +5,9 @@ import { Providers } from "@/components/Providers";
 export const metadata: Metadata = {
   title: "Locus Kanban",
   description: "Open source project management.",
+  icons: {
+    icon: "/locus_logo.png",
+  },
 };
 
 export default function RootLayout({

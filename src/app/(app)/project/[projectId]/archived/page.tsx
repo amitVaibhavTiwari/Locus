@@ -1,16 +1,11 @@
 import { notFound, redirect } from "next/navigation";
-import {
-  getSessionUser,
-  getActiveOrg,
-  getProject,
-  getProjectSprints,
-} from "@/lib/dal";
+import { getSessionUser, getActiveOrg, getProject } from "@/lib/dal";
 import { db } from "@/lib/db";
-import { BacklogClient } from "./BacklogClient";
+import { ArchivedClient } from "./ArchivedClient";
 
 const PAGE_SIZE = 20;
 
-export default async function ProjectBacklogPage({
+export default async function ProjectArchivedPage({
   params,
 }: {
   params: Promise<{ projectId: string }>;
@@ -20,22 +15,17 @@ export default async function ProjectBacklogPage({
   const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
   if (!org || !user) redirect("/onboarding/workspace");
 
-  const [project, allSprints] = await Promise.all([
-    getProject(projectId, org.id, user.id),
-    getProjectSprints(projectId),
-  ]);
-
+  const project = await getProject(projectId, org.id, user.id);
   if (!project) notFound();
 
-  const backlogBaseQuery = db
+  const archivedBaseQuery = db
     .selectFrom("issues")
     .where("project_id", "=", projectId)
-    .where("sprint_id", "is", null)
-    .where("parent_issue_id", "is", null)
-    .where("archived", "=", 0);
+    .where("archived", "=", 1)
+    .where("parent_issue_id", "is", null);
 
   const [firstRows, countRow] = await Promise.all([
-    backlogBaseQuery
+    archivedBaseQuery
       .select([
         "id",
         "issue_number",
@@ -47,14 +37,15 @@ export default async function ProjectBacklogPage({
         "due_date",
         "created_at",
         "completed_at",
+        "archived_at",
         "assignee_id",
         "reporter_id",
         "epic_id",
       ])
-      .orderBy("created_at", "desc")
+      .orderBy("archived_at", "desc")
       .limit(PAGE_SIZE + 1)
       .execute(),
-    backlogBaseQuery
+    archivedBaseQuery
       .select((eb) => eb.fn.countAll<number>().as("total"))
       .executeTakeFirst(),
   ]);
@@ -119,6 +110,7 @@ export default async function ProjectBacklogPage({
     due_date: issue.due_date,
     created_at: issue.created_at,
     completed_at: issue.completed_at,
+    archived_at: issue.archived_at,
     labels: labelMap.get(issue.id) ?? [],
     epic_name: issue.epic_id ? (epicMap.get(issue.epic_id) ?? null) : null,
     assignee: issue.assignee_id
@@ -129,22 +121,13 @@ export default async function ProjectBacklogPage({
       : null,
   }));
 
-  const sprints = allSprints
-    .filter((s) => s.status === "active" || s.status === "planned")
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      status: s.status as "active" | "planned",
-    }));
-
   return (
-    <BacklogClient
+    <ArchivedClient
       projectId={projectId}
       projectName={project.name}
       initialIssues={initialIssues}
       initialHasMore={hasMore}
       initialTotal={initialTotal}
-      sprints={sprints}
     />
   );
 }

@@ -156,6 +156,8 @@ export async function createIssue(
       due_date: dueDate,
       completed_at: completedAt,
       edit_permission: editPermission,
+      archived: 0,
+      archived_at: null,
       created_at: now,
       updated_at: now,
     })
@@ -303,7 +305,6 @@ export async function updateIssue(
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
 
-  // Permission check
   if (
     issue.edit_permission === "assignee_only" &&
     issue.assignee_id !== session.user.id
@@ -317,7 +318,6 @@ export async function updateIssue(
     return { error: "Only the reporter can edit this issue" };
   }
 
-  // Track what actually changed for the history entry
   const changes: { field: string; from: string | null; to: string | null }[] =
     [];
   if (issue.title !== title)
@@ -357,7 +357,6 @@ export async function updateIssue(
     .where("id", "=", issueId)
     .execute();
 
-  // Replace labels atomically
   await db.deleteFrom("issue_labels").where("issue_id", "=", issueId).execute();
   if (labelNames.length > 0) {
     const labelIds = await Promise.all(
@@ -413,5 +412,54 @@ export async function deleteIssue(
   await db.deleteFrom("issues").where("id", "=", issueId).execute();
 
   revalidatePath(`/project/${issue.project_id}`);
+  return {};
+}
+
+export async function archiveIssue(
+  issueId: string,
+): Promise<{ error?: string }> {
+  const session = await verifySession();
+
+  const issue = await db
+    .selectFrom("issues")
+    .where("id", "=", issueId)
+    .select(["project_id", "organization_id"])
+    .executeTakeFirst();
+  if (!issue) return { error: "Issue not found" };
+
+  const membership = await db
+    .selectFrom("project_members")
+    .where("project_id", "=", issue.project_id)
+    .where("user_id", "=", session.user.id)
+    .where("role", "=", "manager")
+    .select("id")
+    .executeTakeFirst();
+
+  if (!membership) return { error: "Only project managers can archive tasks" };
+
+  await db
+    .updateTable("issues")
+    .set({ archived: 1, archived_at: new Date().toISOString() })
+    .where("id", "=", issueId)
+    .execute();
+
+  after(async () => {
+    await db
+      .insertInto("activities")
+      .values({
+        id: randomUUID(),
+        organization_id: issue.organization_id,
+        project_id: issue.project_id,
+        issue_id: issueId,
+        user_id: session.user.id,
+        type: "issue_archived",
+        payload: "{}",
+        created_at: new Date().toISOString(),
+      })
+      .execute();
+  });
+
+  revalidatePath(`/project/${issue.project_id}`);
+  revalidatePath(`/project/${issue.project_id}/archived`);
   return {};
 }

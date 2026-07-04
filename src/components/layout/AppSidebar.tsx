@@ -8,7 +8,6 @@ import {
   Users,
   Settings,
   Pin,
-  KanbanSquare,
   ChevronDown,
   ChevronRight,
   Send,
@@ -53,12 +52,23 @@ const settingsNavigation = [
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
-const getProjectSubMenu = (projectId: string) => [
+type SubMenuItem =
+  | { title: string; url: string; children?: never }
+  | { title: string; url?: never; children: { title: string; url: string }[] };
+
+const getProjectSubMenu = (projectId: string): SubMenuItem[] => [
   { title: "Board", url: `/project/${projectId}` },
   { title: "Team", url: `/project/${projectId}/team` },
   { title: "Sprints", url: `/project/${projectId}/sprints` },
   { title: "Backlogs", url: `/project/${projectId}/backlog` },
-  { title: "Epics", url: `/epics` },
+  {
+    title: "Archived",
+    children: [
+      { title: "Tasks", url: `/project/${projectId}/archived` },
+      { title: "Epics", url: `/project/${projectId}/archived/epics` },
+    ],
+  },
+  { title: "Epics", url: `/project/${projectId}/epics` },
   { title: "Settings", url: `/project/${projectId}/settings` },
 ];
 
@@ -79,10 +89,18 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const currentPath = usePathname();
   const [openProjects, setOpenProjects] = useState<Record<string, boolean>>({});
+  const [openArchived, setOpenArchived] = useState<Record<string, boolean>>({});
   const [, startTransition] = useTransition();
 
   const toggleProject = (projectId: string) => {
     setOpenProjects((prev) => ({
+      ...prev,
+      [projectId]: !prev[projectId],
+    }));
+  };
+
+  const toggleArchived = (projectId: string) => {
+    setOpenArchived((prev) => ({
       ...prev,
       [projectId]: !prev[projectId],
     }));
@@ -105,14 +123,20 @@ export function AppSidebar({
   return (
     <Sidebar className="bg-accent/5 border-r border-border">
       <SidebarContent>
-        {/* Header / Workspace Switcher */}
         <div className="p-4 border-b border-border">
           {workspaces.length > 1 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 w-full rounded-lg hover:bg-secondary transition-colors p-1 -m-1 group">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <KanbanSquare className="w-5 h-5 text-primary" />
+                  <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/locus_logo.png"
+                      alt="Locus"
+                      width={32}
+                      height={32}
+                      className="rounded-lg"
+                    />
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <h1 className="font-bold text-sm text-foreground truncate">
@@ -137,8 +161,15 @@ export function AppSidebar({
                       startTransition(() => switchWorkspace(ws.id));
                     }}
                   >
-                    <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center shrink-0">
-                      <KanbanSquare className="w-3 h-3 text-primary" />
+                    <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/locus_logo.png"
+                        alt="Locus"
+                        width={20}
+                        height={20}
+                        className="rounded"
+                      />
                     </div>
                     <span className="flex-1 truncate">{ws.name}</span>
                     {ws.id === activeOrgId && (
@@ -150,8 +181,15 @@ export function AppSidebar({
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-3">
-              <div className="w-8 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                <KanbanSquare className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/locus_logo.png"
+                  alt="Locus"
+                  width={32}
+                  height={32}
+                  className="rounded-lg"
+                />
               </div>
               <div>
                 <h1 className="font-bold text-base text-foreground">
@@ -207,7 +245,6 @@ export function AppSidebar({
                           ) : (
                             <ChevronRight className="w-4 h-4 mr-2" />
                           )}
-                          <div className="w-3 h-3 rounded-full mr-2 bg-primary/60" />
                           <span className="font-medium truncate">
                             {project.name}
                           </span>
@@ -216,16 +253,56 @@ export function AppSidebar({
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="ml-6 mt-1 space-y-1">
-                        {getProjectSubMenu(project.id).map((subItem) => (
-                          <SidebarMenuButton key={subItem.title} asChild>
-                            <Link
-                              href={subItem.url}
-                              className={getSubNavClassName(subItem.url)}
+                        {getProjectSubMenu(project.id).map((subItem) =>
+                          subItem.children ? (
+                            <Collapsible
+                              key={subItem.title}
+                              open={openArchived[project.id]}
+                              onOpenChange={() => toggleArchived(project.id)}
                             >
-                              <span>{subItem.title}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        ))}
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuButton className="w-full hover:bg-secondary text-muted-foreground hover:text-sidebar-accent-foreground text-sm">
+                                  <div className="flex items-center w-full">
+                                    {openArchived[project.id] ? (
+                                      <ChevronDown className="w-3.5 h-3.5 mr-2 shrink-0" />
+                                    ) : (
+                                      <ChevronRight className="w-3.5 h-3.5 mr-2 shrink-0" />
+                                    )}
+                                    <span>{subItem.title}</span>
+                                  </div>
+                                </SidebarMenuButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="ml-5 mt-1 space-y-1">
+                                  {subItem.children.map((child) => (
+                                    <SidebarMenuButton
+                                      key={child.title}
+                                      asChild
+                                    >
+                                      <Link
+                                        href={child.url}
+                                        className={getSubNavClassName(
+                                          child.url,
+                                        )}
+                                      >
+                                        <span>{child.title}</span>
+                                      </Link>
+                                    </SidebarMenuButton>
+                                  ))}
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          ) : (
+                            <SidebarMenuButton key={subItem.title} asChild>
+                              <Link
+                                href={subItem.url}
+                                className={getSubNavClassName(subItem.url)}
+                              >
+                                <span>{subItem.title}</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          ),
+                        )}
                       </div>
                     </CollapsibleContent>
                   </SidebarMenuItem>

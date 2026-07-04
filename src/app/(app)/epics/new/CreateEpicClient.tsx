@@ -106,7 +106,7 @@ export function CreateEpicClient({
         return;
       }
       toast({ title: "Epic created" });
-      router.push(`/epics?projectId=${projectId}`);
+      router.push(`/project/${projectId}/epics`);
     });
   };
 
@@ -118,7 +118,7 @@ export function CreateEpicClient({
             variant="ghost"
             onClick={() =>
               router.push(
-                projectId ? `/epics?projectId=${projectId}` : "/epics",
+                projectId ? `/project/${projectId}/epics` : "/projects",
               )
             }
             className="mb-4 hover:bg-transparent text-muted-foreground hover:text-foreground -ml-3"

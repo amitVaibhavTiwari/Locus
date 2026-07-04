@@ -1,8 +1,12 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -10,9 +14,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Loader2, Pencil, Archive, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
-import { updateEpicStatus } from "@/actions/epics";
+import { updateEpicStatus, updateEpic, archiveEpic } from "@/actions/epics";
+import { useProjectRoleStore } from "@/stores/projectRoleStore";
 
 interface User {
   id: string;
@@ -42,9 +70,10 @@ interface Epic {
   description: string | null;
   priority: string;
   status: string;
+  end_date: string | null;
   totalIssues: number;
   doneIssues: number;
-  owner: { id: string; username: string; avatar_url: string | null } | null;
+  owner: User | null;
 }
 
 interface EpicDetailClientProps {
@@ -80,11 +109,214 @@ const STATUS_BADGE: Record<string, string> = {
   pending: "bg-orange-500/10 text-orange-500 border-orange-500/30",
 };
 
+function OwnerSearchPopover({
+  projectId,
+  value,
+  label,
+  onChange,
+}: {
+  projectId: string;
+  value: string;
+  label: string;
+  onChange: (id: string, name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (query) params.set("q", query);
+        const res = await fetch(
+          `/api/projects/${projectId}/backlog/users?${params}`,
+        );
+        if (res.ok) setUsers(await res.json());
+      } finally {
+        setLoading(false);
+      }
+    }, 200);
+    return () => clearTimeout(t);
+  }, [open, query, projectId]);
+
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">{label || "No owner"}</span>
+          <ChevronDown className="w-3 h-3 ml-1 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="start">
+        <Input
+          placeholder="Search member..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="h-8 mb-2 text-sm"
+          autoFocus
+        />
+        <div className="space-y-0.5 max-h-52 overflow-y-auto">
+          {value && (
+            <button
+              className="w-full text-left px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted rounded-sm"
+              onClick={() => {
+                onChange("", "");
+                setOpen(false);
+              }}
+            >
+              ✕ Remove owner
+            </button>
+          )}
+          {loading ? (
+            <div className="flex justify-center py-3">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : users.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3">
+              No members found
+            </p>
+          ) : (
+            users.map((u) => (
+              <button
+                key={u.id}
+                className={`w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-muted flex items-center gap-2 transition-colors ${value === u.id ? "bg-primary/10 text-primary font-medium" : ""}`}
+                onClick={() => {
+                  onChange(u.id, u.username);
+                  setOpen(false);
+                }}
+              >
+                <Avatar className="w-5 h-5 shrink-0">
+                  {u.avatar_url && <AvatarImage src={u.avatar_url} />}
+                  <AvatarFallback className="text-[9px]">
+                    {getInitials(u.username)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate">{u.username}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [, startTransition] = useTransition();
+
   const [epicStatus, setEpicStatus] = useState(epic.status);
+  const [isManager, setIsManager] = useState(false);
+
+  const { getRole } = useProjectRoleStore();
+  useEffect(() => {
+    getRole(epic.project_id).then((role) => setIsManager(role === "manager"));
+  }, [epic.project_id, getRole]);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState(epic.name);
+  const [editDesc, setEditDesc] = useState(epic.description ?? "");
+  const [editPriority, setEditPriority] = useState(epic.priority);
+  const [editStatus, setEditStatus] = useState(epic.status);
+  const [editOwnerId, setEditOwnerId] = useState(epic.owner?.id ?? "");
+  const [editOwnerLabel, setEditOwnerLabel] = useState(
+    epic.owner?.username ?? "",
+  );
+  const [editEndDate, setEditEndDate] = useState(epic.end_date ?? "");
+  const [editPending, setEditPending] = useState(false);
+
+  const openEdit = () => {
+    setEditName(epic.name);
+    setEditDesc(epic.description ?? "");
+    setEditPriority(epic.priority);
+    setEditStatus(epicStatus);
+    setEditOwnerId(epic.owner?.id ?? "");
+    setEditOwnerLabel(epic.owner?.username ?? "");
+    setEditEndDate(epic.end_date ?? "");
+    setEditOpen(true);
+  };
+
+  const handleEdit = () => {
+    if (!editName.trim()) {
+      toast({
+        title: "Error",
+        description: "Epic name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEditPending(true);
+    startTransition(async () => {
+      const result = await updateEpic(epic.id, {
+        name: editName.trim(),
+        description: editDesc.trim() || null,
+        priority: editPriority,
+        status: editStatus,
+        owner_id: editOwnerId || null,
+        end_date: editEndDate || null,
+      });
+      setEditPending(false);
+      if (result?.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Epic updated" });
+      setEpicStatus(editStatus);
+      setEditOpen(false);
+      router.refresh();
+    });
+  };
+
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archivePending, setArchivePending] = useState(false);
+
+  const handleArchiveClick = () => {
+    if (epicStatus !== "done") {
+      toast({
+        title: "Cannot archive",
+        description: "Epic must be marked as done before it can be archived.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setArchiveOpen(true);
+  };
+
+  const handleArchiveConfirm = () => {
+    setArchivePending(true);
+    startTransition(async () => {
+      const result = await archiveEpic(epic.id);
+      setArchivePending(false);
+      if (result?.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
+        setArchiveOpen(false);
+        return;
+      }
+      toast({ title: "Epic archived" });
+      setArchiveOpen(false);
+      router.push(`/project/${epic.project_id}/epics`);
+    });
+  };
 
   const handleStatusChange = (value: string) => {
     setEpicStatus(value);
@@ -99,7 +331,7 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
         setEpicStatus(epic.status);
         return;
       }
-      toast({ title: "Epic status updated" });
+      toast({ title: "Status updated" });
       router.refresh();
     });
   };
@@ -155,33 +387,58 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
           </div>
         </div>
 
-        <div className="relative w-20 h-20 flex-shrink-0">
-          <svg className="w-20 h-20 transform -rotate-90">
-            <circle
-              cx="40"
-              cy="40"
-              r="32"
-              stroke="currentColor"
-              strokeWidth="6"
-              fill="none"
-              className="text-muted"
-            />
-            <circle
-              cx="40"
-              cy="40"
-              r="32"
-              stroke="currentColor"
-              strokeWidth="6"
-              fill="none"
-              strokeDasharray={`${2 * Math.PI * 32}`}
-              strokeDashoffset={`${2 * Math.PI * 32 * (1 - pct / 100)}`}
-              className="text-primary transition-all duration-300"
-              strokeLinecap="round"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-lg font-bold">{pct}%</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative w-20 h-20">
+            <svg className="w-20 h-20 transform -rotate-90">
+              <circle
+                cx="40"
+                cy="40"
+                r="32"
+                stroke="currentColor"
+                strokeWidth="6"
+                fill="none"
+                className="text-muted"
+              />
+              <circle
+                cx="40"
+                cy="40"
+                r="32"
+                stroke="currentColor"
+                strokeWidth="6"
+                fill="none"
+                strokeDasharray={`${2 * Math.PI * 32}`}
+                strokeDashoffset={`${2 * Math.PI * 32 * (1 - pct / 100)}`}
+                className="text-primary transition-all duration-300"
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-lg font-bold">{pct}%</span>
+            </div>
           </div>
+
+          {isManager && (
+            <div className="flex flex-col gap-2 ml-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={openEdit}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-destructive border-destructive/40 hover:bg-destructive/10"
+                onClick={handleArchiveClick}
+              >
+                <Archive className="w-3.5 h-3.5" />
+                Archive
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -239,6 +496,140 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
           </div>
         )}
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Epic</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Name *</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Epic name"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                placeholder="Describe the epic..."
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Priority</Label>
+                <Select value={editPriority} onValueChange={setEditPriority}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="highest">Highest</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planned">Planned</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Owner</Label>
+              <OwnerSearchPopover
+                projectId={epic.project_id}
+                value={editOwnerId}
+                label={editOwnerLabel}
+                onChange={(id, name) => {
+                  setEditOwnerId(id);
+                  setEditOwnerLabel(name);
+                }}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                value={editEndDate}
+                onChange={(e) => setEditEndDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={editPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleEdit} disabled={editPending}>
+              {editPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this epic?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This epic will be archived and hidden from the epics list. This
+              action cannot be undone easily.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archivePending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchiveConfirm}
+              disabled={archivePending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {archivePending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Archiving...
+                </>
+              ) : (
+                "Archive"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

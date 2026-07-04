@@ -352,6 +352,7 @@ export const getProjectEpics = cache(async (projectId: string) => {
   const epics = await db
     .selectFrom("epics")
     .where("project_id", "=", projectId)
+    .where("archived", "=", 0)
     .selectAll()
     .orderBy("created_at", "desc")
     .execute();
