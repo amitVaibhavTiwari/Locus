@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { sql } from "kysely";
 import { auth } from "@/lib/auth";
 
 const PAGE_SIZE_KANBAN = 20;
@@ -211,7 +212,7 @@ export async function GET(
     const rows = await base
       .where("issues.status", "=", status)
       .select(SELECT_FIELDS)
-      .orderBy("issues.issue_number", "asc")
+      .orderBy("issues.issue_number", "desc")
       .limit(PAGE_SIZE_KANBAN + 1)
       .offset(offset)
       .execute();
@@ -226,19 +227,26 @@ export async function GET(
 
   if (view === "table") {
     const offset = Math.max(0, parseInt(sp.get("offset") ?? "0"));
-    const sort = sp.get("sort") ?? "issue_number:asc";
+    const sort = sp.get("sort") ?? "created_at:desc";
     const [rawField, rawDir] = sort.split(":");
     const sortField = (VALID_SORT_FIELDS as readonly string[]).includes(
       rawField,
     )
       ? rawField
-      : "issue_number";
+      : "created_at";
     const sortDir = rawDir === "desc" ? "desc" : "asc";
+
+    const priorityCaseExpr = sql<number>`CASE issues.priority WHEN 'highest' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END`;
 
     const rows = await base
       .select(SELECT_FIELDS)
+      .$if(sortField === "priority", (q) =>
+        q.orderBy(priorityCaseExpr, sortDir),
+      )
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .orderBy(`issues.${sortField}` as any, sortDir)
+      .$if(sortField !== "priority", (q) =>
+        q.orderBy(`issues.${sortField}` as any, sortDir),
+      )
       .limit(PAGE_SIZE_TABLE + 1)
       .offset(offset)
       .execute();

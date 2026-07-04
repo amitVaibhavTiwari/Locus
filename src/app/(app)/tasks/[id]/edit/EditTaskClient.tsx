@@ -1,5 +1,11 @@
 "use client";
-import React, { useState, useTransition, useRef, useCallback, useEffect } from "react";
+import React, {
+  useState,
+  useTransition,
+  useRef,
+  useCallback,
+  useEffect,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +20,28 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, X, Search, ArrowLeft, Loader2, Upload, FileText, Paperclip, Trash2 } from "lucide-react";
+import {
+  CalendarIcon,
+  X,
+  Search,
+  ArrowLeft,
+  Loader2,
+  Upload,
+  FileText,
+  Paperclip,
+  Trash2,
+} from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { RichTextEditor, RichTextEditorRef } from "@/components/editor/RichTextEditor";
+import {
+  RichTextEditor,
+  RichTextEditorRef,
+} from "@/components/editor/RichTextEditor";
 import { cn, cleanFilename } from "@/lib/utils";
 import {
   Command,
@@ -94,11 +117,24 @@ interface EditTaskClientProps {
 }
 
 const predefinedLabels = [
-  "Frontend", "Backend", "UI", "Bug", "Feature", "Documentation", "Testing", "Security", "Performance",
+  "Frontend",
+  "Backend",
+  "UI",
+  "Bug",
+  "Feature",
+  "Documentation",
+  "Testing",
+  "Security",
+  "Performance",
 ];
 
 function getInitials(username: string) {
-  return username.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  return username
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 function MemberPicker({
@@ -155,7 +191,9 @@ function MemberPicker({
             <div className="flex items-center gap-2">
               <Avatar className="w-5 h-5">
                 <AvatarImage src={selected.avatar_url ?? undefined} />
-                <AvatarFallback className="text-xs">{getInitials(selected.username)}</AvatarFallback>
+                <AvatarFallback className="text-xs">
+                  {getInitials(selected.username)}
+                </AvatarFallback>
               </Avatar>
               {selected.username}
             </div>
@@ -182,7 +220,10 @@ function MemberPicker({
                   {selected && (
                     <CommandItem
                       value="__clear__"
-                      onSelect={() => { onSelect(null); setOpen(false); }}
+                      onSelect={() => {
+                        onSelect(null);
+                        setOpen(false);
+                      }}
                       className="text-muted-foreground"
                     >
                       Clear selection
@@ -199,11 +240,15 @@ function MemberPicker({
                     >
                       <Avatar className="w-6 h-6 mr-2">
                         <AvatarImage src={member.avatar_url ?? undefined} />
-                        <AvatarFallback className="text-xs">{getInitials(member.username)}</AvatarFallback>
+                        <AvatarFallback className="text-xs">
+                          {getInitials(member.username)}
+                        </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col">
                         <span className="text-sm">{member.username}</span>
-                        <span className="text-xs text-muted-foreground">{member.email}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {member.email}
+                        </span>
                       </div>
                     </CommandItem>
                   ))}
@@ -238,18 +283,29 @@ export function EditTaskClient({
   );
   const [labels, setLabels] = useState<string[]>(issue.labels);
   const [customLabel, setCustomLabel] = useState("");
-  const [epic, setEpic] = useState<{ id: string; name: string } | null>(issue.epic);
-  const [editPermission, setEditPermission] = useState<"anyone" | "assignee_only" | "reporter_only">(
-    issue.editPermission,
+  const [epic, setEpic] = useState<{ id: string; name: string } | null>(
+    issue.epic,
   );
-  const [existingAttachments, setExistingAttachments] = useState<ExistingAttachment[]>([]);
+  const [editPermission, setEditPermission] = useState<
+    "anyone" | "assignee_only" | "reporter_only"
+  >(issue.editPermission);
+  const [existingAttachments, setExistingAttachments] = useState<
+    ExistingAttachment[]
+  >([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(true);
   const [newAttachments, setNewAttachments] = useState<File[]>([]);
-  const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<{ id: string; filename: string } | null>(null);
+  const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<{
+    id: string;
+    filename: string;
+  } | null>(null);
   const [epicOpen, setEpicOpen] = useState(false);
-  const [epicResults, setEpicResults] = useState<{ id: string; name: string }[]>([]);
+  const [epicResults, setEpicResults] = useState<
+    { id: string; name: string }[]
+  >([]);
   const [epicLoading, setEpicLoading] = useState(false);
-  const epicTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const epicTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const editorRef = useRef<RichTextEditorRef>(null);
 
   useEffect(() => {
@@ -264,7 +320,11 @@ export function EditTaskClient({
     e.preventDefault();
 
     if (!taskTitle.trim()) {
-      toast({ title: "Error", description: "Task title is required", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Task title is required",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -275,7 +335,9 @@ export function EditTaskClient({
         : labels;
 
     startTransition(async () => {
-      const finalDescription = editorRef.current ? await editorRef.current.flush() : description;
+      const finalDescription = editorRef.current
+        ? await editorRef.current.flush()
+        : description;
 
       const formData = new FormData();
       formData.set("issue_id", issue.id);
@@ -290,7 +352,11 @@ export function EditTaskClient({
 
       const result = await updateIssue(undefined, formData);
       if (result?.error) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
 
@@ -349,18 +415,27 @@ export function EditTaskClient({
   const addLabel = (label: string) => {
     if (label && !labels.includes(label)) setLabels([...labels, label]);
   };
-  const removeLabel = (label: string) => setLabels(labels.filter((l) => l !== label));
+  const removeLabel = (label: string) =>
+    setLabels(labels.filter((l) => l !== label));
   const addCustomLabel = () => {
-    if (customLabel.trim()) { addLabel(customLabel.trim()); setCustomLabel(""); }
+    if (customLabel.trim()) {
+      addLabel(customLabel.trim());
+      setCustomLabel("");
+    }
   };
 
   const handleDeleteExisting = async (attachmentId: string) => {
     setConfirmDeleteAttachment(null);
-    const res = await fetch(`/api/attachments/${issue.id}?attachmentId=${attachmentId}`, {
-      method: "DELETE",
-    });
+    const res = await fetch(
+      `/api/attachments/${issue.id}?attachmentId=${attachmentId}`,
+      {
+        method: "DELETE",
+      },
+    );
     if (res.ok) {
-      setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      setExistingAttachments((prev) =>
+        prev.filter((a) => a.id !== attachmentId),
+      );
     } else {
       toast({ title: "Failed to delete attachment", variant: "destructive" });
     }
@@ -403,12 +478,20 @@ export function EditTaskClient({
 
         <form onSubmit={handleSubmit} className="space-y-6 pl-2">
           <div className="space-y-2">
-            <Label htmlFor="title">Task Title *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="title">Task Title *</Label>
+              <span
+                className={`text-xs ${taskTitle.length > 130 ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {taskTitle.length}/150
+              </span>
+            </div>
             <Input
               id="title"
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
               placeholder="Enter task title"
+              maxLength={150}
               className="w-full"
             />
           </div>
@@ -443,7 +526,12 @@ export function EditTaskClient({
 
             <div className="space-y-2">
               <Label>Who can edit</Label>
-              <Select value={editPermission} onValueChange={(v) => setEditPermission(v as typeof editPermission)}>
+              <Select
+                value={editPermission}
+                onValueChange={(v) =>
+                  setEditPermission(v as typeof editPermission)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -471,13 +559,21 @@ export function EditTaskClient({
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 Reporter
-                <span className="text-xs font-normal text-muted-foreground">(cannot be edited)</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  (cannot be edited)
+                </span>
               </Label>
-              <Button variant="outline" className="w-full justify-start opacity-60 cursor-not-allowed" disabled>
+              <Button
+                variant="outline"
+                className="w-full justify-start opacity-60 cursor-not-allowed"
+                disabled
+              >
                 <div className="flex items-center gap-2">
                   <Avatar className="w-5 h-5">
                     <AvatarImage src={issue.reporter.avatar_url ?? undefined} />
-                    <AvatarFallback className="text-xs">{getInitials(issue.reporter.username)}</AvatarFallback>
+                    <AvatarFallback className="text-xs">
+                      {getInitials(issue.reporter.username)}
+                    </AvatarFallback>
                   </Avatar>
                   {issue.reporter.username}
                 </div>
@@ -490,7 +586,10 @@ export function EditTaskClient({
               <Label>Due Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dueDate ? format(dueDate, "PPP") : "Pick a date"}
                   </Button>
@@ -515,13 +614,19 @@ export function EditTaskClient({
                     {epic ? (
                       epic.name
                     ) : (
-                      <><Search className="w-4 h-4 mr-2" />Search epic...</>
+                      <>
+                        <Search className="w-4 h-4 mr-2" />
+                        Search epic...
+                      </>
                     )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[300px] p-0" align="start">
                   <Command shouldFilter={false}>
-                    <CommandInput placeholder="Search epic..." onValueChange={handleEpicSearch} />
+                    <CommandInput
+                      placeholder="Search epic..."
+                      onValueChange={handleEpicSearch}
+                    />
                     <CommandList>
                       {epicLoading ? (
                         <div className="flex items-center justify-center py-4">
@@ -534,7 +639,10 @@ export function EditTaskClient({
                             {epic && (
                               <CommandItem
                                 value="__clear__"
-                                onSelect={() => { setEpic(null); setEpicOpen(false); }}
+                                onSelect={() => {
+                                  setEpic(null);
+                                  setEpicOpen(false);
+                                }}
                                 className="text-muted-foreground"
                               >
                                 Clear selection
@@ -544,7 +652,10 @@ export function EditTaskClient({
                               <CommandItem
                                 key={e.id}
                                 value={e.id}
-                                onSelect={() => { setEpic(e); setEpicOpen(false); }}
+                                onSelect={() => {
+                                  setEpic(e);
+                                  setEpicOpen(false);
+                                }}
                               >
                                 {e.name}
                               </CommandItem>
@@ -568,7 +679,11 @@ export function EditTaskClient({
                   type="button"
                   variant={labels.includes(label) ? "default" : "outline"}
                   size="sm"
-                  onClick={() => labels.includes(label) ? removeLabel(label) : addLabel(label)}
+                  onClick={() =>
+                    labels.includes(label)
+                      ? removeLabel(label)
+                      : addLabel(label)
+                  }
                 >
                   {label}
                 </Button>
@@ -579,16 +694,27 @@ export function EditTaskClient({
                 value={customLabel}
                 onChange={(e) => setCustomLabel(e.target.value)}
                 placeholder="Add custom label"
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomLabel())}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && (e.preventDefault(), addCustomLabel())
+                }
               />
-              <Button type="button" onClick={addCustomLabel} size="sm">Add</Button>
+              <Button type="button" onClick={addCustomLabel} size="sm">
+                Add
+              </Button>
             </div>
             {labels.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {labels.map((label) => (
-                  <Badge key={label} variant="secondary" className="flex items-center gap-1">
+                  <Badge
+                    key={label}
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
                     {label}
-                    <X className="w-3 h-3 cursor-pointer" onClick={() => removeLabel(label)} />
+                    <X
+                      className="w-3 h-3 cursor-pointer"
+                      onClick={() => removeLabel(label)}
+                    />
                   </Badge>
                 ))}
               </div>
@@ -622,7 +748,9 @@ export function EditTaskClient({
                       rel="noopener noreferrer"
                       className="flex-1 min-w-0"
                     >
-                      <p className="text-sm font-medium truncate hover:underline">{cleanFilename(file.filename)}</p>
+                      <p className="text-sm font-medium truncate hover:underline">
+                        {cleanFilename(file.filename)}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {formatBytes(file.size)} · {file.uploader_name}
                       </p>
@@ -631,7 +759,12 @@ export function EditTaskClient({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => setConfirmDeleteAttachment({ id: file.id, filename: file.filename })}
+                      onClick={() =>
+                        setConfirmDeleteAttachment({
+                          id: file.id,
+                          filename: file.filename,
+                        })
+                      }
                     >
                       <Trash2 className="w-4 h-4 text-muted-foreground" />
                     </Button>
@@ -650,21 +783,37 @@ export function EditTaskClient({
               />
               <label htmlFor="file-upload-edit" className="cursor-pointer">
                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Click to upload or drag and drop</p>
-                <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPG, GIF up to 50MB</p>
+                <p className="text-sm text-muted-foreground">
+                  Click to upload or drag and drop
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, PNG, JPG, GIF up to 50MB
+                </p>
               </label>
             </div>
 
             {newAttachments.length > 0 && (
               <div className="space-y-2">
                 {newAttachments.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg"
+                  >
                     <div className="flex items-center gap-2">
                       <Paperclip className="w-4 h-4 shrink-0" />
-                      <span className="text-sm truncate">{cleanFilename(file.name)}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">({formatBytes(file.size)})</span>
+                      <span className="text-sm truncate">
+                        {cleanFilename(file.name)}
+                      </span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        ({formatBytes(file.size)})
+                      </span>
                     </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeNewAttachment(index)}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeNewAttachment(index)}
+                    >
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
@@ -674,7 +823,12 @@ export function EditTaskClient({
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isPending}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
@@ -686,20 +840,29 @@ export function EditTaskClient({
 
       <AlertDialog
         open={!!confirmDeleteAttachment}
-        onOpenChange={(open) => { if (!open) setConfirmDeleteAttachment(null); }}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteAttachment(null);
+        }}
       >
         <AlertDialogContent className="sm:max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete attachment?</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{confirmDeleteAttachment ? cleanFilename(confirmDeleteAttachment.filename) : ""}&rdquo; will be permanently deleted.
+              &ldquo;
+              {confirmDeleteAttachment
+                ? cleanFilename(confirmDeleteAttachment.filename)
+                : ""}
+              &rdquo; will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => confirmDeleteAttachment && handleDeleteExisting(confirmDeleteAttachment.id)}
+              onClick={() =>
+                confirmDeleteAttachment &&
+                handleDeleteExisting(confirmDeleteAttachment.id)
+              }
             >
               Delete
             </AlertDialogAction>

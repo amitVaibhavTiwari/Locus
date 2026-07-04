@@ -62,14 +62,14 @@ export function TaskCard({ task, isDragging = false }: TaskCardProps) {
         >
           <CardContent className="p-3">
             <div className="mb-2">
-              <h4 className="font-semibold text-sm text-foreground line-clamp-2">
+              <h4 className="font-semibold text-sm text-foreground line-clamp-2 break-words">
                 {task.title}
               </h4>
             </div>
 
             {task.labels && task.labels.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2">
-                {task.labels.map((label, index) => (
+                {task.labels.slice(0, 2).map((label, index) => (
                   <Badge
                     key={index}
                     variant="secondary"
@@ -78,6 +78,14 @@ export function TaskCard({ task, isDragging = false }: TaskCardProps) {
                     {label}
                   </Badge>
                 ))}
+                {task.labels.length > 2 && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs px-2 py-0.5 text-muted-foreground"
+                  >
+                    +{task.labels.length - 2}
+                  </Badge>
+                )}
               </div>
             )}
 

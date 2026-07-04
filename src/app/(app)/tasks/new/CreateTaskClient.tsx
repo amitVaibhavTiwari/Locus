@@ -14,11 +14,26 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, X, Paperclip, Upload, Search, ArrowLeft, Loader2 } from "lucide-react";
+import {
+  CalendarIcon,
+  X,
+  Paperclip,
+  Upload,
+  Search,
+  ArrowLeft,
+  Loader2,
+} from "lucide-react";
 import { format } from "date-fns";
-import { RichTextEditor, type RichTextEditorRef } from "@/components/editor/RichTextEditor";
+import {
+  RichTextEditor,
+  type RichTextEditorRef,
+} from "@/components/editor/RichTextEditor";
 import { cn, cleanFilename } from "@/lib/utils";
 import {
   Command,
@@ -59,11 +74,24 @@ interface CreateTaskClientProps {
 }
 
 const predefinedLabels = [
-  "Frontend", "Backend", "UI", "Bug", "Feature", "Documentation", "Testing", "Security", "Performance",
+  "Frontend",
+  "Backend",
+  "UI",
+  "Bug",
+  "Feature",
+  "Documentation",
+  "Testing",
+  "Security",
+  "Performance",
 ];
 
 function getInitials(username: string) {
-  return username.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  return username
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 function MemberPicker({
@@ -120,7 +148,9 @@ function MemberPicker({
             <div className="flex items-center gap-2">
               <Avatar className="w-5 h-5">
                 <AvatarImage src={selected.avatar_url ?? undefined} />
-                <AvatarFallback className="text-xs">{getInitials(selected.username)}</AvatarFallback>
+                <AvatarFallback className="text-xs">
+                  {getInitials(selected.username)}
+                </AvatarFallback>
               </Avatar>
               {selected.username}
             </div>
@@ -155,11 +185,15 @@ function MemberPicker({
                     >
                       <Avatar className="w-6 h-6 mr-2">
                         <AvatarImage src={member.avatar_url ?? undefined} />
-                        <AvatarFallback className="text-xs">{getInitials(member.username)}</AvatarFallback>
+                        <AvatarFallback className="text-xs">
+                          {getInitials(member.username)}
+                        </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col">
                         <span className="text-sm">{member.username}</span>
-                        <span className="text-xs text-muted-foreground">{member.email}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {member.email}
+                        </span>
                       </div>
                     </CommandItem>
                   ))}
@@ -194,28 +228,39 @@ export function CreateTaskClient({
   const [status, setStatus] = useState(defaultStatus);
   const [assignee, setAssignee] = useState<Member | null>(null);
   const [reporter, setReporter] = useState<Member | null>(
-    initialMembers.find((m) => m.id === currentUserId) ?? initialMembers[0] ?? null,
+    initialMembers.find((m) => m.id === currentUserId) ??
+      initialMembers[0] ??
+      null,
   );
   const [dueDate, setDueDate] = useState<Date>();
   const [labels, setLabels] = useState<string[]>([]);
   const [customLabel, setCustomLabel] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [epic, setEpic] = useState<{ id: string; name: string } | null>(null);
-  // Default to the active sprint if one exists, otherwise backlog (null)
   const [sprintId, setSprintId] = useState<string | null>(
     sprints.find((s) => s.status === "active")?.id ?? null,
   );
-  const [editPermission, setEditPermission] = useState<"anyone" | "assignee_only" | "reporter_only">("anyone");
+  const [editPermission, setEditPermission] = useState<
+    "anyone" | "assignee_only" | "reporter_only"
+  >("anyone");
   const [epicOpen, setEpicOpen] = useState(false);
-  const [epicResults, setEpicResults] = useState<{ id: string; name: string }[]>([]);
+  const [epicResults, setEpicResults] = useState<
+    { id: string; name: string }[]
+  >([]);
   const [epicLoading, setEpicLoading] = useState(false);
-  const epicTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const epicTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!taskTitle.trim()) {
-      toast({ title: "Error", description: "Task title is required", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Task title is required",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -228,9 +273,14 @@ export function CreateTaskClient({
     startTransition(async () => {
       let finalDescription = description;
       try {
-        if (editorRef.current) finalDescription = await editorRef.current.flush();
+        if (editorRef.current)
+          finalDescription = await editorRef.current.flush();
       } catch {
-        toast({ title: "Image upload failed", description: "Could not upload one or more pasted images.", variant: "destructive" });
+        toast({
+          title: "Image upload failed",
+          description: "Could not upload one or more pasted images.",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -251,7 +301,11 @@ export function CreateTaskClient({
 
       const result = await createIssue(undefined, formData);
       if (result?.error) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
 
@@ -267,14 +321,21 @@ export function CreateTaskClient({
           }),
         );
         if (failed.length > 0) {
-          toast({ title: "Some attachments failed to upload", description: failed.join(", "), variant: "destructive" });
+          toast({
+            title: "Some attachments failed to upload",
+            description: failed.join(", "),
+            variant: "destructive",
+          });
         }
       }
 
       const locationLabel = sprintId
         ? (sprints.find((s) => s.id === sprintId)?.name ?? "sprint")
         : "backlog";
-      toast({ title: "Task created", description: `Added to ${locationLabel}` });
+      toast({
+        title: "Task created",
+        description: `Added to ${locationLabel}`,
+      });
       router.push(`/project/${projectId}`);
     });
   };
@@ -309,9 +370,13 @@ export function CreateTaskClient({
   const addLabel = (label: string) => {
     if (label && !labels.includes(label)) setLabels([...labels, label]);
   };
-  const removeLabel = (label: string) => setLabels(labels.filter((l) => l !== label));
+  const removeLabel = (label: string) =>
+    setLabels(labels.filter((l) => l !== label));
   const addCustomLabel = () => {
-    if (customLabel.trim()) { addLabel(customLabel.trim()); setCustomLabel(""); }
+    if (customLabel.trim()) {
+      addLabel(customLabel.trim());
+      setCustomLabel("");
+    }
   };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAttachments((prev) => [...prev, ...Array.from(e.target.files || [])]);
@@ -342,12 +407,20 @@ export function CreateTaskClient({
 
         <form onSubmit={handleSubmit} className="space-y-6 pl-2">
           <div className="space-y-2">
-            <Label htmlFor="title">Task Title *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="title">Task Title *</Label>
+              <span
+                className={`text-xs ${taskTitle.length > 130 ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {taskTitle.length}/150
+              </span>
+            </div>
             <Input
               id="title"
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
               placeholder="Enter task title"
+              maxLength={150}
               className="w-full"
             />
           </div>
@@ -415,7 +488,9 @@ export function CreateTaskClient({
               <Label>Location</Label>
               <Select
                 value={sprintId ?? "__backlog__"}
-                onValueChange={(v) => setSprintId(v === "__backlog__" ? null : v)}
+                onValueChange={(v) =>
+                  setSprintId(v === "__backlog__" ? null : v)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -426,7 +501,9 @@ export function CreateTaskClient({
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                       {s.status === "active" && (
-                        <span className="ml-1 text-xs text-muted-foreground">(active)</span>
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          (active)
+                        </span>
                       )}
                     </SelectItem>
                   ))}
@@ -469,7 +546,10 @@ export function CreateTaskClient({
               <Label>Due Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dueDate ? format(dueDate, "PPP") : "Pick a date"}
                   </Button>
@@ -488,7 +568,12 @@ export function CreateTaskClient({
 
             <div className="space-y-2">
               <Label>Who can edit</Label>
-              <Select value={editPermission} onValueChange={(v) => setEditPermission(v as typeof editPermission)}>
+              <Select
+                value={editPermission}
+                onValueChange={(v) =>
+                  setEditPermission(v as typeof editPermission)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -508,13 +593,19 @@ export function CreateTaskClient({
                     {epic ? (
                       epic.name
                     ) : (
-                      <><Search className="w-4 h-4 mr-2" />Search epic...</>
+                      <>
+                        <Search className="w-4 h-4 mr-2" />
+                        Search epic...
+                      </>
                     )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[300px] p-0" align="start">
                   <Command shouldFilter={false}>
-                    <CommandInput placeholder="Search epic..." onValueChange={handleEpicSearch} />
+                    <CommandInput
+                      placeholder="Search epic..."
+                      onValueChange={handleEpicSearch}
+                    />
                     <CommandList>
                       {epicLoading ? (
                         <div className="flex items-center justify-center py-4">
@@ -527,7 +618,10 @@ export function CreateTaskClient({
                             {epic && (
                               <CommandItem
                                 value="__clear__"
-                                onSelect={() => { setEpic(null); setEpicOpen(false); }}
+                                onSelect={() => {
+                                  setEpic(null);
+                                  setEpicOpen(false);
+                                }}
                                 className="text-muted-foreground"
                               >
                                 Clear selection
@@ -537,7 +631,10 @@ export function CreateTaskClient({
                               <CommandItem
                                 key={e.id}
                                 value={e.id}
-                                onSelect={() => { setEpic(e); setEpicOpen(false); }}
+                                onSelect={() => {
+                                  setEpic(e);
+                                  setEpicOpen(false);
+                                }}
                               >
                                 {e.name}
                               </CommandItem>
@@ -561,7 +658,11 @@ export function CreateTaskClient({
                   type="button"
                   variant={labels.includes(label) ? "default" : "outline"}
                   size="sm"
-                  onClick={() => labels.includes(label) ? removeLabel(label) : addLabel(label)}
+                  onClick={() =>
+                    labels.includes(label)
+                      ? removeLabel(label)
+                      : addLabel(label)
+                  }
                 >
                   {label}
                 </Button>
@@ -572,16 +673,27 @@ export function CreateTaskClient({
                 value={customLabel}
                 onChange={(e) => setCustomLabel(e.target.value)}
                 placeholder="Add custom label"
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomLabel())}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && (e.preventDefault(), addCustomLabel())
+                }
               />
-              <Button type="button" onClick={addCustomLabel} size="sm">Add</Button>
+              <Button type="button" onClick={addCustomLabel} size="sm">
+                Add
+              </Button>
             </div>
             {labels.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {labels.map((label) => (
-                  <Badge key={label} variant="secondary" className="flex items-center gap-1">
+                  <Badge
+                    key={label}
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
                     {label}
-                    <X className="w-3 h-3 cursor-pointer" onClick={() => removeLabel(label)} />
+                    <X
+                      className="w-3 h-3 cursor-pointer"
+                      onClick={() => removeLabel(label)}
+                    />
                   </Badge>
                 ))}
               </div>
@@ -591,23 +703,45 @@ export function CreateTaskClient({
           <div className="space-y-3">
             <Label>Attachments</Label>
             <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-              <input type="file" id="file-upload" className="hidden" multiple onChange={handleFileChange} />
+              <input
+                type="file"
+                id="file-upload"
+                className="hidden"
+                multiple
+                onChange={handleFileChange}
+              />
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Click to upload or drag and drop</p>
-                <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPG, GIF up to 10MB</p>
+                <p className="text-sm text-muted-foreground">
+                  Click to upload or drag and drop
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, PNG, JPG, GIF up to 10MB
+                </p>
               </label>
             </div>
             {attachments.length > 0 && (
               <div className="space-y-2">
                 {attachments.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg"
+                  >
                     <div className="flex items-center gap-2">
                       <Paperclip className="w-4 h-4" />
-                      <span className="text-sm">{cleanFilename(file.name)}</span>
-                      <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(2)} KB)</span>
+                      <span className="text-sm">
+                        {cleanFilename(file.name)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ({(file.size / 1024).toFixed(2)} KB)
+                      </span>
                     </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeAttachment(index)}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeAttachment(index)}
+                    >
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
@@ -617,7 +751,12 @@ export function CreateTaskClient({
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isPending}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>

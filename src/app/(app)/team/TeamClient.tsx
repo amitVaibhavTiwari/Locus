@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { inviteTeammates, removeMember } from "@/actions/members";
 import { formatDateTime } from "@/lib/date";
+import { mapOrgRole } from "@/lib/utils";
 
 interface Member {
   memberId: string;
@@ -69,12 +70,6 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
-function mapRole(role: "owner" | "admin" | "member"): string {
-  if (role === "owner") return "Super Admin";
-  if (role === "admin") return "Admin";
-  return "Member";
-}
-
 export function TeamClient({
   initialMembers,
   initialHasMore,
@@ -101,7 +96,6 @@ export function TeamClient({
   const [memberToArchive, setMemberToArchive] = useState<Member | null>(null);
   const [unassignTasks, setUnassignTasks] = useState(false);
 
-  // Refs for IntersectionObserver
   const offsetRef = useRef(initialMembers.length);
   const searchRef = useRef("");
   const roleRef = useRef("all");
@@ -117,7 +111,6 @@ export function TeamClient({
     (currentUserRole === "admin" && allowAdminInvite);
   const canRemove = currentUserRole === "owner";
 
-  // Debounce search/filter — reset and refetch
   useEffect(() => {
     const t = setTimeout(async () => {
       searchRef.current = searchQuery;
@@ -131,7 +124,8 @@ export function TeamClient({
         if (roleFilter !== "all") params.set("role", roleFilter);
         const res = await fetch(`/api/org/members?${params}`);
         if (!res.ok) return;
-        const data: { members: Member[]; hasMore: boolean; total: number } = await res.json();
+        const data: { members: Member[]; hasMore: boolean; total: number } =
+          await res.json();
         setMembers(data.members);
         setHasMore(data.hasMore);
         setTotal(data.total);
@@ -145,7 +139,6 @@ export function TeamClient({
     return () => clearTimeout(t);
   }, [searchQuery, roleFilter]);
 
-  // Infinite scroll
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -197,9 +190,16 @@ export function TeamClient({
         { email: newMemberEmail, role: newMemberRole.toLowerCase() },
       ]);
       if (result.error) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
       } else {
-        toast({ title: "Invitation sent", description: `Invitation sent to ${newMemberEmail}` });
+        toast({
+          title: "Invitation sent",
+          description: `Invitation sent to ${newMemberEmail}`,
+        });
         setNewMemberEmail("");
         setNewMemberRole("");
         setInviteDialogOpen(false);
@@ -212,13 +212,19 @@ export function TeamClient({
     startTransition(async () => {
       const result = await removeMember(memberToArchive.memberId);
       if (result?.error) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Member removed",
           description: `${memberToArchive.username} has been removed from the workspace`,
         });
-        setMembers((prev) => prev.filter((m) => m.memberId !== memberToArchive.memberId));
+        setMembers((prev) =>
+          prev.filter((m) => m.memberId !== memberToArchive.memberId),
+        );
       }
       setMemberToArchive(null);
       setUnassignTasks(false);
@@ -269,7 +275,10 @@ export function TeamClient({
                 </div>
                 <div className="space-y-2">
                   <Label>Role *</Label>
-                  <Select value={newMemberRole} onValueChange={setNewMemberRole}>
+                  <Select
+                    value={newMemberRole}
+                    onValueChange={setNewMemberRole}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
@@ -280,7 +289,10 @@ export function TeamClient({
                   </Select>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setInviteDialogOpen(false)}
+                  >
                     Cancel
                   </Button>
                   <Button onClick={handleInviteMember}>Send Invitation</Button>
@@ -307,7 +319,7 @@ export function TeamClient({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="owner">Super Admin</SelectItem>
+            <SelectItem value="owner">Owner</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="member">Member</SelectItem>
           </SelectContent>
@@ -353,10 +365,16 @@ export function TeamClient({
               <div className="flex items-center gap-6">
                 <div className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground">
                   <CalendarDays className="w-4 h-4" />
-                  <span>{formatDateTime(member.joined_at, { month: "short", day: "numeric", year: "numeric" })}</span>
+                  <span>
+                    {formatDateTime(member.joined_at, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
                 </div>
                 <span className="text-sm text-muted-foreground w-24 text-right">
-                  {mapRole(member.role)}
+                  {mapOrgRole(member.role)}
                 </span>
 
                 {showMenu ? (
@@ -371,7 +389,10 @@ export function TeamClient({
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuContent
+                      align="end"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
                         onClick={(e) => {
@@ -396,7 +417,9 @@ export function TeamClient({
 
         {!loading && members.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground">No team members found</p>
+            <p className="text-sm text-muted-foreground">
+              No team members found
+            </p>
           </div>
         )}
       </div>
@@ -427,7 +450,9 @@ export function TeamClient({
             <Checkbox
               id="unassign-tasks"
               checked={unassignTasks}
-              onCheckedChange={(checked) => setUnassignTasks(checked as boolean)}
+              onCheckedChange={(checked) =>
+                setUnassignTasks(checked as boolean)
+              }
             />
             <label
               htmlFor="unassign-tasks"
@@ -437,7 +462,10 @@ export function TeamClient({
             </label>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setArchiveDialogOpen(false)}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleArchiveMember}>

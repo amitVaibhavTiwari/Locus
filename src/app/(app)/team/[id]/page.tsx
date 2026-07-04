@@ -1,14 +1,8 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { verifySession, getActiveOrg } from "@/lib/dal";
+import { mapOrgRole } from "@/lib/utils";
 import { ProfileClient } from "./ProfileClient";
-
-function mapRole(role: string | null): string {
-  if (role === "owner") return "Super Admin";
-  if (role === "admin") return "Admin";
-  if (role === "member") return "Member";
-  return "No role";
-}
 
 export default async function ProfilePage({
   params,
@@ -49,7 +43,7 @@ export default async function ProfilePage({
         username: user.username,
         avatar_url: user.avatar_url,
       }}
-      role={mapRole(role)}
+      role={mapOrgRole(role)}
       joinedAt={joinedAt}
       isOwnProfile={session.user.id === user.id}
     />

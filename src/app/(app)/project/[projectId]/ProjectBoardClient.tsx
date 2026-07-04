@@ -79,16 +79,14 @@ export function ProjectBoardClient({
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [subGroupBy, setSubGroupBy] = useState<SubGroupBy>("none");
 
-  // ── Filters ───────────────────────────────────────────────────────────────────
   const [sprintFilter, setSprintFilter] = useState("current");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [reporterFilter, setReporterFilter] = useState("all");
+  const [tableSort, setTableSort] = useState("created_at:desc");
 
-  // ── Kanban state ──────────────────────────────────────────────────────────────
   const [kanbanData, setKanbanData] = useState<Record<string, ColumnState>>({});
 
-  // ── Table state ───────────────────────────────────────────────────────────────
   const [tableData, setTableData] = useState<{
     tasks: Task[];
     hasMore: boolean;
@@ -96,11 +94,9 @@ export function ProjectBoardClient({
   }>({ tasks: [], hasMore: false, loading: false });
   const tableOffsetRef = useRef(0);
 
-  // ── DOM refs ──────────────────────────────────────────────────────────────────
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const kanbanSentinelRef = useRef<HTMLDivElement>(null);
 
-  // ── Build filter params ───────────────────────────────────────────────────────
   const buildFilterParams = useCallback(
     (extra: Record<string, string> = {}) => {
       const p: Record<string, string> = { sprintFilter };
@@ -112,10 +108,15 @@ export function ProjectBoardClient({
       if (reporterFilter !== "all") p.reporterId = reporterFilter;
       return new URLSearchParams({ ...p, ...extra });
     },
-    [sprintFilter, activeSprintId, priorityFilter, assigneeFilter, reporterFilter],
+    [
+      sprintFilter,
+      activeSprintId,
+      priorityFilter,
+      assigneeFilter,
+      reporterFilter,
+    ],
   );
 
-  // ── Kanban: initial fetch on view/filter change ────────────────────────────────
   useEffect(() => {
     if (viewMode !== "kanban" || boardColumns.length === 0) return;
     let cancelled = false;
@@ -130,7 +131,11 @@ export function ProjectBoardClient({
     );
 
     boardColumns.forEach(async (col) => {
-      const p = buildFilterParams({ view: "kanban", status: col.id, offset: "0" });
+      const p = buildFilterParams({
+        view: "kanban",
+        status: col.id,
+        offset: "0",
+      });
       try {
         const res = await fetch(`/api/projects/${projectId}/board?${p}`);
         if (!res.ok || cancelled) return;
@@ -155,11 +160,20 @@ export function ProjectBoardClient({
       }
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, projectId, sprintFilter, activeSprintId, priorityFilter, assigneeFilter, reporterFilter]);
+  }, [
+    viewMode,
+    projectId,
+    sprintFilter,
+    activeSprintId,
+    priorityFilter,
+    assigneeFilter,
+    reporterFilter,
+  ]);
 
-  // ── Kanban: load-more for a single column ─────────────────────────────────────
   const handleLoadMoreColumn = useCallback(
     async (columnId: string) => {
       const current = kanbanData[columnId];
@@ -171,7 +185,11 @@ export function ProjectBoardClient({
       }));
 
       const offset = current.tasks.length;
-      const p = buildFilterParams({ view: "kanban", status: columnId, offset: String(offset) });
+      const p = buildFilterParams({
+        view: "kanban",
+        status: columnId,
+        offset: String(offset),
+      });
 
       try {
         const res = await fetch(`/api/projects/${projectId}/board?${p}`);
@@ -194,11 +212,11 @@ export function ProjectBoardClient({
     [kanbanData, buildFilterParams, projectId],
   );
 
-  // Keep a stable ref so the IntersectionObserver never captures a stale closure
   const loadMoreColumnRef = useRef(handleLoadMoreColumn);
-  useEffect(() => { loadMoreColumnRef.current = handleLoadMoreColumn; }, [handleLoadMoreColumn]);
+  useEffect(() => {
+    loadMoreColumnRef.current = handleLoadMoreColumn;
+  }, [handleLoadMoreColumn]);
 
-  // ── Kanban: scroll-based pagination via sentinel ───────────────────────────────
   useEffect(() => {
     if (viewMode !== "kanban") return;
     const sentinel = kanbanSentinelRef.current;
@@ -217,7 +235,6 @@ export function ProjectBoardClient({
     return () => observer.disconnect();
   }, [viewMode, boardColumns]);
 
-  // ── Kanban: update column data when DnD reorders ──────────────────────────────
   const handleKanbanTasksChange = useCallback((updatedTasks: Task[]) => {
     setKanbanData((prev) => {
       const tasksByStatus = new Map<string, Task[]>();
@@ -237,7 +254,6 @@ export function ProjectBoardClient({
     });
   }, []);
 
-  // ── Table: initial fetch on view/filter change ────────────────────────────────
   useEffect(() => {
     if (viewMode !== "table") return;
     let cancelled = false;
@@ -245,29 +261,52 @@ export function ProjectBoardClient({
     tableOffsetRef.current = 0;
     setTableData({ tasks: [], hasMore: false, loading: true });
 
-    const p = buildFilterParams({ view: "table", offset: "0" });
+    const p = buildFilterParams({
+      view: "table",
+      offset: "0",
+      sort: tableSort,
+    });
     fetch(`/api/projects/${projectId}/board?${p}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
         tableOffsetRef.current = data.tasks?.length ?? 0;
-        setTableData({ tasks: data.tasks ?? [], hasMore: !!data.hasMore, loading: false });
+        setTableData({
+          tasks: data.tasks ?? [],
+          hasMore: !!data.hasMore,
+          loading: false,
+        });
       })
       .catch(() => {
-        if (!cancelled) setTableData({ tasks: [], hasMore: false, loading: false });
+        if (!cancelled)
+          setTableData({ tasks: [], hasMore: false, loading: false });
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, projectId, sprintFilter, activeSprintId, priorityFilter, assigneeFilter, reporterFilter]);
+  }, [
+    viewMode,
+    projectId,
+    sprintFilter,
+    activeSprintId,
+    priorityFilter,
+    assigneeFilter,
+    reporterFilter,
+    tableSort,
+  ]);
 
-  // ── Table: load-more triggered by IntersectionObserver in ProjectTableView ────
   const handleTableLoadMore = useCallback(async () => {
     if (tableData.loading || !tableData.hasMore) return;
 
     setTableData((prev) => ({ ...prev, loading: true }));
     const offset = tableOffsetRef.current;
-    const p = buildFilterParams({ view: "table", offset: String(offset) });
+    const p = buildFilterParams({
+      view: "table",
+      offset: String(offset),
+      sort: tableSort,
+    });
 
     try {
       const res = await fetch(`/api/projects/${projectId}/board?${p}`);
@@ -281,7 +320,13 @@ export function ProjectBoardClient({
     } catch {
       setTableData((prev) => ({ ...prev, loading: false }));
     }
-  }, [tableData.loading, tableData.hasMore, buildFilterParams, projectId]);
+  }, [
+    tableData.loading,
+    tableData.hasMore,
+    buildFilterParams,
+    projectId,
+    tableSort,
+  ]);
 
   const handleTableStatusChange = useCallback(
     (taskId: string, newStatus: Task["status"]) => {
@@ -295,7 +340,6 @@ export function ProjectBoardClient({
     [],
   );
 
-  // ── Pin/unpin ─────────────────────────────────────────────────────────────────
   const handleTogglePin = () => {
     const wasPin = !isPinned;
     setIsPinned(wasPin);
@@ -312,17 +356,19 @@ export function ProjectBoardClient({
     });
   };
 
-  // ── Move issue (DnD) ──────────────────────────────────────────────────────────
   const handleMoveIssue = (issueId: string, newStatus: Task["status"]) => {
     startTransition(async () => {
       const result = await moveIssue(issueId, newStatus);
       if (result?.error) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
       }
     });
   };
 
-  // ── Derived kanban state for KanbanBoard ──────────────────────────────────────
   const allKanbanTasks = Object.values(kanbanData).flatMap((c) => c.tasks);
   const columnHasMore: Record<string, boolean> = {};
   const columnLoading: Record<string, boolean> = {};
@@ -339,10 +385,11 @@ export function ProjectBoardClient({
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
-      {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 bg-background border-b border-border px-6 pt-4 pb-3">
         <div className="mb-3 flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-foreground truncate">{projectName}</h1>
+          <h1 className="text-2xl font-bold text-foreground truncate">
+            {projectName}
+          </h1>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -351,24 +398,36 @@ export function ProjectBoardClient({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => router.push(`/project/${projectId}/team`)}>
+              <DropdownMenuItem
+                onClick={() => router.push(`/project/${projectId}/team`)}
+              >
                 <Users className="w-4 h-4 mr-2" /> Team Members
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/backlog?projectId=${projectId}`)}>
+              <DropdownMenuItem
+                onClick={() => router.push(`/backlog?projectId=${projectId}`)}
+              >
                 <List className="w-4 h-4 mr-2" /> Backlog
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/project/${projectId}/sprints`)}>
+              <DropdownMenuItem
+                onClick={() => router.push(`/project/${projectId}/sprints`)}
+              >
                 <Calendar className="w-4 h-4 mr-2" /> Sprints
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/project/${projectId}/settings`)}>
+              <DropdownMenuItem
+                onClick={() => router.push(`/project/${projectId}/settings`)}
+              >
                 <Settings className="w-4 h-4 mr-2" /> Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleTogglePin}>
                 {isPinned ? (
-                  <><PinOff className="w-4 h-4 mr-2" /> Unpin from Sidebar</>
+                  <>
+                    <PinOff className="w-4 h-4 mr-2" /> Unpin from Sidebar
+                  </>
                 ) : (
-                  <><Pin className="w-4 h-4 mr-2" /> Pin to Sidebar</>
+                  <>
+                    <Pin className="w-4 h-4 mr-2" /> Pin to Sidebar
+                  </>
                 )}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -392,7 +451,9 @@ export function ProjectBoardClient({
                       <tab.icon className="w-4 h-4" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent><p>{tab.label}</p></TooltipContent>
+                  <TooltipContent>
+                    <p>{tab.label}</p>
+                  </TooltipContent>
                 </Tooltip>
               ))}
             </div>
@@ -417,7 +478,10 @@ export function ProjectBoardClient({
               triggerClassName="w-40 h-9"
               options={[
                 { value: "all", label: "All Assignees" },
-                ...projectMembers.map((m) => ({ value: m.id, label: m.username })),
+                ...projectMembers.map((m) => ({
+                  value: m.id,
+                  label: m.username,
+                })),
               ]}
             />
 
@@ -429,7 +493,10 @@ export function ProjectBoardClient({
               triggerClassName="w-40 h-9"
               options={[
                 { value: "all", label: "All Reporters" },
-                ...projectMembers.map((m) => ({ value: m.id, label: m.username })),
+                ...projectMembers.map((m) => ({
+                  value: m.id,
+                  label: m.username,
+                })),
               ]}
             />
 
@@ -447,7 +514,7 @@ export function ProjectBoardClient({
               </SelectContent>
             </Select>
 
-            {viewMode !== "calendar" && (
+            {viewMode === "kanban" && (
               <div className="flex items-center gap-1.5 pl-2 ml-1 border-l border-border">
                 <Layers className="w-4 h-4 text-muted-foreground" />
                 <Select
@@ -460,9 +527,41 @@ export function ProjectBoardClient({
                   <SelectContent>
                     {subGroupOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {opt.value === "none" ? "No sub-group" : `Group by ${opt.label}`}
+                        {opt.value === "none"
+                          ? "No sub-group"
+                          : `Group by ${opt.label}`}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {viewMode === "table" && (
+              <div className="flex items-center gap-1.5 pl-2 ml-1 border-l border-border">
+                <Select value={tableSort} onValueChange={setTableSort}>
+                  <SelectTrigger className="w-48 h-9">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created_at:desc">
+                      Created (Newest first)
+                    </SelectItem>
+                    <SelectItem value="created_at:asc">
+                      Created (Oldest first)
+                    </SelectItem>
+                    <SelectItem value="due_date:asc">
+                      Deadline (Earliest first)
+                    </SelectItem>
+                    <SelectItem value="due_date:desc">
+                      Deadline (Latest first)
+                    </SelectItem>
+                    <SelectItem value="priority:asc">
+                      Priority (Highest first)
+                    </SelectItem>
+                    <SelectItem value="priority:desc">
+                      Priority (Lowest first)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -479,7 +578,6 @@ export function ProjectBoardClient({
         </div>
       </div>
 
-      {/* ── Content area ────────────────────────────────────────────────────── */}
       <div
         ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-auto px-6 pb-6"
@@ -497,7 +595,6 @@ export function ProjectBoardClient({
               columnHasMore={columnHasMore}
               columnLoading={columnLoading}
             />
-            {/* scroll sentinel — when visible, load next page for all columns */}
             <div ref={kanbanSentinelRef} className="h-1" />
           </>
         )}
@@ -506,8 +603,10 @@ export function ProjectBoardClient({
           <ProjectTableView
             tasks={tableData.tasks}
             onStatusChange={handleTableStatusChange}
-            subGroupBy={subGroupBy}
-            boardStatuses={boardColumns.map((c) => ({ key: c.id, name: c.title }))}
+            boardStatuses={boardColumns.map((c) => ({
+              key: c.id,
+              name: c.title,
+            }))}
             hasMore={tableData.hasMore}
             isLoading={tableData.loading}
             onLoadMore={handleTableLoadMore}

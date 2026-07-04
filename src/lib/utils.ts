@@ -8,3 +8,10 @@ export function cn(...inputs: ClassValue[]) {
 export function cleanFilename(filename: string): string {
   return filename.replace(/\.[^.]+$/, "");
 }
+
+export function mapOrgRole(role: string | null): string {
+  if (role === "owner") return "Owner";
+  if (role === "admin") return "Admin";
+  if (role === "member") return "Member";
+  return "No role";
+}
