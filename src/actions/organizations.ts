@@ -173,3 +173,24 @@ export async function updateWorkspaceSettings(
   revalidatePath("/", "layout");
   return undefined;
 }
+
+export async function switchWorkspace(orgId: string): Promise<void> {
+  const session = await verifySession();
+
+  const membership = await db
+    .selectFrom("organization_members")
+    .where("organization_id", "=", orgId)
+    .where("user_id", "=", session.user.id)
+    .select(["id"])
+    .executeTakeFirst();
+
+  if (!membership) return;
+
+  await db
+    .updateTable("user_preferences")
+    .set({ active_organization_id: orgId, updated_at: new Date().toISOString() })
+    .where("user_id", "=", session.user.id)
+    .execute();
+
+  redirect("/dashboard");
+}

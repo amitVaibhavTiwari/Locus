@@ -1,38 +1,74 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft, Square, CheckCircle2, Clock, Plus, Minus, ListChecks,
-  TrendingUp, TrendingDown, Search,
+  ArrowLeft,
+  Square,
+  CheckCircle2,
+  Clock,
+  Plus,
+  Minus,
+  ListChecks,
+  TrendingUp,
+  TrendingDown,
+  Search,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { startSprint, completeSprint } from "@/actions/sprints";
+import { formatDate, daysUntil, daysSince, daysBetween } from "@/lib/date";
 
 interface Issue {
   id: string;
   issue_number: number;
   title: string;
+  description: string | null;
   status: string;
   priority: string;
+  due_date: string | null;
+  created_at: string;
   completed_at: string | null;
   assignee: { id: string; username: string; avatar_url: string | null } | null;
+  reporter: { id: string; username: string; avatar_url: string | null } | null;
+  labels: string[];
+  epic_name: string | null;
 }
 
 interface Sprint {
@@ -49,35 +85,53 @@ interface SprintDetailClientProps {
   projectName: string;
   sprint: Sprint;
   issues: Issue[];
-  hasNextSprint: boolean;
 }
 
 function getInitials(name: string) {
-  return name.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
-function daysRemaining(endDate: string | null) {
-  if (!endDate) return null;
-  return Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000));
-}
-
-function totalDays(start: string | null, end: string | null) {
-  if (!start || !end) return null;
-  return Math.max(1, Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / 86400000));
-}
-
-const CircularProgress = ({ value, size = 96, stroke = 8, label }: {
-  value: number; size?: number; stroke?: number; label: string;
+const CircularProgress = ({
+  value,
+  size = 96,
+  stroke = 8,
+  label,
+}: {
+  value: number;
+  size?: number;
+  stroke?: number;
+  label: string;
 }) => {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="hsl(var(--muted))" strokeWidth={stroke} fill="none" />
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="hsl(var(--primary))" strokeWidth={stroke} fill="none"
-          strokeDasharray={circ} strokeDashoffset={circ - (value / 100) * circ} strokeLinecap="round"
-          className="transition-all duration-500" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="hsl(var(--muted))"
+          strokeWidth={stroke}
+          fill="none"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="hsl(var(--primary))"
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={circ}
+          strokeDashoffset={circ - (value / 100) * circ}
+          strokeLinecap="round"
+          className="transition-all duration-500"
+        />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         <span className="text-sm font-semibold">{label}</span>
@@ -87,7 +141,10 @@ const CircularProgress = ({ value, size = 96, stroke = 8, label }: {
 };
 
 export function SprintDetailClient({
-  projectId, projectName, sprint, issues, hasNextSprint,
+  projectId,
+  projectName,
+  sprint,
+  issues,
 }: SprintDetailClientProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -98,31 +155,64 @@ export function SprintDetailClient({
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [teamSearch, setTeamSearch] = useState("");
   const [endSprintOpen, setEndSprintOpen] = useState(false);
-  const [incompleteAction, setIncompleteAction] = useState<"backlog" | "next">("backlog");
+  const [moveTarget, setMoveTarget] = useState<string>("backlog");
+  const [futureSprints, setFutureSprints] = useState<
+    {
+      id: string;
+      name: string;
+      start_date: string | null;
+      end_date: string | null;
+    }[]
+  >([]);
+  const [sprintsLoading, setSprintsLoading] = useState(false);
 
   const completedIssues = issues.filter((i) => i.completed_at !== null);
   const incompleteIssues = issues.filter((i) => i.completed_at === null);
-  const completionPct = issues.length > 0 ? Math.round((completedIssues.length / issues.length) * 100) : 0;
+  const completionPct =
+    issues.length > 0
+      ? Math.round((completedIssues.length / issues.length) * 100)
+      : 0;
 
-  const days = daysRemaining(sprint.end_date);
-  const total = totalDays(sprint.start_date, sprint.end_date);
-  const elapsed = total && days !== null ? total - days : null;
-  const timePct = total && elapsed !== null ? Math.round((elapsed / total) * 100) : 0;
+  const days = daysUntil(sprint.end_date);
+  const spanDays = daysBetween(sprint.start_date, sprint.end_date); // e.g. 3 for Jul3–Jul6
+  const total = spanDays !== null ? spanDays + 1 : null; // inclusive: 4
+  const sinceStart = daysSince(sprint.start_date); // 0 on day 1, 1 on day 2…
+  const elapsed = sinceStart !== null ? sinceStart + 1 : null; // current day number (1-based)
+  const timePct =
+    spanDays && sinceStart !== null
+      ? Math.min(100, Math.round((sinceStart / spanDays) * 100))
+      : 0;
 
-  const uniqueAssignees = [...new Set(issues.map((i) => i.assignee?.username).filter(Boolean))] as string[];
+  const uniqueAssignees = [
+    ...new Set(issues.map((i) => i.assignee?.username).filter(Boolean)),
+  ] as string[];
 
   const filteredIssues = issues.filter((i) => {
     const ms = statusFilter === "all" || i.status === statusFilter;
     const mp = priorityFilter === "all" || i.priority === priorityFilter;
-    const ma = assigneeFilter === "all" || i.assignee?.username === assigneeFilter;
+    const ma =
+      assigneeFilter === "all" || i.assignee?.username === assigneeFilter;
     return ms && mp && ma;
   });
 
-  const teamMap = new Map<string, { username: string; avatar_url: string | null; completed: number; total: number }>();
+  const teamMap = new Map<
+    string,
+    {
+      username: string;
+      avatar_url: string | null;
+      completed: number;
+      total: number;
+    }
+  >();
   issues.forEach((i) => {
     if (!i.assignee) return;
     const u = i.assignee;
-    const prev = teamMap.get(u.id) ?? { username: u.username, avatar_url: u.avatar_url, completed: 0, total: 0 };
+    const prev = teamMap.get(u.id) ?? {
+      username: u.username,
+      avatar_url: u.avatar_url,
+      completed: 0,
+      total: 0,
+    };
     prev.total += 1;
     if (i.completed_at !== null) prev.completed += 1;
     teamMap.set(u.id, prev);
@@ -135,7 +225,11 @@ export function SprintDetailClient({
     startTransition(async () => {
       const result = await startSprint(sprint.id);
       if (result?.error) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
       toast({ title: "Sprint started" });
@@ -143,11 +237,30 @@ export function SprintDetailClient({
     });
   };
 
+  const openEndSprintDialog = async () => {
+    setMoveTarget("backlog");
+    setEndSprintOpen(true);
+    setSprintsLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/sprints`);
+      if (res.ok) {
+        const data: { sprints: typeof futureSprints } = await res.json();
+        setFutureSprints(data.sprints);
+      }
+    } finally {
+      setSprintsLoading(false);
+    }
+  };
+
   const handleCompleteSprint = () => {
     startTransition(async () => {
-      const result = await completeSprint(sprint.id, incompleteAction);
+      const result = await completeSprint(sprint.id, moveTarget);
       if (result?.error) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
       toast({ title: "Sprint completed" });
@@ -161,15 +274,28 @@ export function SprintDetailClient({
       {/* Header */}
       <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(`/project/${projectId}/sprints`)}
-            className="hover:bg-transparent text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/project/${projectId}/sprints`)}
+            className="hover:bg-transparent text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{sprint.name}</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {sprint.name}
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {projectName}
-              {sprint.start_date && sprint.end_date && ` • ${sprint.start_date} → ${sprint.end_date}`}
+              {sprint.start_date && sprint.end_date && (
+                <>
+                  {" "}
+                  &bull; {formatDate(sprint.start_date)} &rarr;{" "}
+                  {formatDate(sprint.end_date)}
+                </>
+              )}
+              {sprint.goal && <> &bull; {sprint.goal}</>}
             </p>
           </div>
         </div>
@@ -177,7 +303,10 @@ export function SprintDetailClient({
           {sprint.status === "planned" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button className="bg-success hover:bg-success/90 text-success-foreground" disabled={isPending}>
+                <Button
+                  className="bg-success hover:bg-success/90 text-success-foreground"
+                  disabled={isPending}
+                >
                   Start Sprint
                 </Button>
               </AlertDialogTrigger>
@@ -185,18 +314,25 @@ export function SprintDetailClient({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Start Sprint?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will start the sprint immediately. Make sure all tasks are assigned and ready.
+                    This will start the sprint immediately. Make sure all tasks
+                    are assigned and ready.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleStartSprint}>Start Sprint</AlertDialogAction>
+                  <AlertDialogAction onClick={handleStartSprint}>
+                    Start Sprint
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           )}
           {sprint.status === "active" && (
-            <Button variant="destructive" onClick={() => setEndSprintOpen(true)} disabled={isPending}>
+            <Button
+              variant="destructive"
+              onClick={openEndSprintDialog}
+              disabled={isPending}
+            >
               <Square className="w-4 h-4 mr-2" />
               End Sprint
             </Button>
@@ -209,58 +345,144 @@ export function SprintDetailClient({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>End Sprint</DialogTitle>
-            <DialogDescription>Choose what to do with incomplete tasks before ending the sprint.</DialogDescription>
+            <DialogDescription>
+              Choose where to move incomplete tasks before ending the sprint.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Incomplete tasks: <span className="font-medium text-foreground">{incompleteIssues.length}</span>
-              </p>
-            </div>
+            {incompleteIssues.length > 0 && (
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {incompleteIssues.length}
+                  </span>{" "}
+                  incomplete {incompleteIssues.length === 1 ? "task" : "tasks"}{" "}
+                  will be moved
+                </p>
+              </div>
+            )}
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Move incomplete tasks to:</Label>
-              <div className="space-y-2">
-                {(["backlog", "next"] as const).map((val) => (
-                  <label key={val} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors">
-                    <input type="radio" name="incompleteAction" value={val}
-                      checked={incompleteAction === val}
-                      onChange={() => setIncompleteAction(val)}
-                      className="w-4 h-4" />
+              <Label className="text-sm font-medium">
+                Move incomplete tasks to:
+              </Label>
+              {sprintsLoading ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 p-3 border rounded-lg">
+                    <Skeleton className="w-4 h-4 rounded-full shrink-0" />
+                    <div className="space-y-1.5 flex-1">
+                      <Skeleton className="h-3.5 w-16" />
+                      <Skeleton className="h-3 w-36" />
+                    </div>
+                  </div>
+                  {[1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 p-3 border rounded-lg"
+                    >
+                      <Skeleton className="w-4 h-4 rounded-full shrink-0" />
+                      <div className="space-y-1.5 flex-1">
+                        <Skeleton className="h-3.5 w-28" />
+                        <Skeleton className="h-3 w-44" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  <label
+                    className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${moveTarget === "backlog" ? "border-primary bg-primary/5" : "hover:bg-muted/30"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="moveTarget"
+                      value="backlog"
+                      checked={moveTarget === "backlog"}
+                      onChange={() => setMoveTarget("backlog")}
+                      className="w-4 h-4 accent-primary"
+                    />
                     <div>
-                      <p className="text-sm font-medium">{val === "backlog" ? "Move to Backlog" : "Move to Next Sprint"}</p>
+                      <p className="text-sm font-medium">Backlog</p>
                       <p className="text-xs text-muted-foreground">
-                        {val === "backlog"
-                          ? "Tasks will be added to the product backlog"
-                          : hasNextSprint
-                            ? "Tasks will be carried over to the next planned sprint"
-                            : "No next sprint — tasks will go to backlog instead"}
+                        Tasks go to the product backlog
                       </p>
                     </div>
                   </label>
-                ))}
-              </div>
+
+                  {futureSprints.map((s) => (
+                    <label
+                      key={s.id}
+                      className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${moveTarget === s.id ? "border-primary bg-primary/5" : "hover:bg-muted/30"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="moveTarget"
+                        value={s.id}
+                        checked={moveTarget === s.id}
+                        onChange={() => setMoveTarget(s.id)}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{s.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {s.start_date && s.end_date
+                            ? `${formatDate(s.start_date)} → ${formatDate(s.end_date)}`
+                            : "Dates not set"}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+
+                  {futureSprints.length === 0 && (
+                    <p className="text-xs text-muted-foreground px-1">
+                      No other planned sprints available
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setEndSprintOpen(false)} disabled={isPending}>Cancel</Button>
-            <Button variant="destructive" onClick={handleCompleteSprint} disabled={isPending}>
+            <Button
+              variant="outline"
+              onClick={() => setEndSprintOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCompleteSprint}
+              disabled={isPending || sprintsLoading}
+            >
               {isPending ? "Ending..." : "End Sprint"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Stats */}
       {sprint.status !== "planned" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
           <Card className="bg-card border border-border">
             <CardContent className="p-5 flex items-center gap-5">
-              <CircularProgress value={completionPct} label={`${completionPct}%`} />
+              <CircularProgress
+                value={completionPct}
+                label={`${completionPct}%`}
+              />
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Sprint Progress</p>
-                <p className="text-lg font-semibold mt-1">{completedIssues.length} of {issues.length} done</p>
-                <div className={`inline-flex items-center gap-1 mt-2 text-xs font-medium px-2 py-0.5 rounded-full ${completionPct >= timePct ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-                  {completionPct >= timePct ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Sprint Progress
+                </p>
+                <p className="text-lg font-semibold mt-1">
+                  {completedIssues.length} of {issues.length} done
+                </p>
+                <div
+                  className={`inline-flex items-center gap-1 mt-2 text-xs font-medium px-2 py-0.5 rounded-full ${completionPct >= timePct ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}
+                >
+                  {completionPct >= timePct ? (
+                    <TrendingUp className="w-3 h-3" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3" />
+                  )}
                   {completionPct >= timePct ? "On track" : "Behind schedule"}
                 </div>
               </div>
@@ -269,14 +491,22 @@ export function SprintDetailClient({
 
           <Card className="bg-card border border-border">
             <CardContent className="p-5 flex items-center gap-5">
-              <CircularProgress value={timePct} label={days !== null ? `${days}d` : "—"} />
+              <CircularProgress
+                value={timePct}
+                label={days !== null ? `${days}d` : "—"}
+              />
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Time Remaining</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Time Remaining
+                </p>
                 <p className="text-lg font-semibold mt-1">
-                  {elapsed !== null && total ? `Day ${elapsed} of ${total}` : "—"}
+                  {elapsed !== null && total
+                    ? `Day ${elapsed} of ${total}`
+                    : "—"}
                 </p>
                 <div className="inline-flex items-center gap-1 mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                  <Clock className="w-3 h-3" />{timePct}% elapsed
+                  <Clock className="w-3 h-3" />
+                  {timePct}% elapsed
                 </div>
               </div>
             </CardContent>
@@ -284,18 +514,45 @@ export function SprintDetailClient({
 
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: "Total", value: issues.length, icon: ListChecks, color: "primary" },
-              { label: "Completed", value: completedIssues.length, icon: CheckCircle2, color: "success" },
-              { label: "Remaining", value: incompleteIssues.length, icon: Plus, color: "warning" },
-              { label: "Done %", value: `${completionPct}%`, icon: Minus, color: "muted-foreground" },
+              {
+                label: "Total",
+                value: issues.length,
+                icon: ListChecks,
+                color: "primary",
+              },
+              {
+                label: "Completed",
+                value: completedIssues.length,
+                icon: CheckCircle2,
+                color: "success",
+              },
+              {
+                label: "Remaining",
+                value: incompleteIssues.length,
+                icon: Plus,
+                color: "warning",
+              },
+              {
+                label: "Done %",
+                value: `${completionPct}%`,
+                icon: Minus,
+                color: "muted-foreground",
+              },
             ].map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="rounded-lg border border-border bg-card p-3 flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-md bg-${color}/10 flex items-center justify-center`}>
+              <div
+                key={label}
+                className="rounded-lg border border-border bg-card p-3 flex items-center gap-3"
+              >
+                <div
+                  className={`w-9 h-9 rounded-md bg-${color}/10 flex items-center justify-center`}
+                >
                   <Icon className={`w-4 h-4 text-${color}`} />
                 </div>
                 <div>
                   <p className="text-[11px] text-muted-foreground">{label}</p>
-                  <p className="text-base font-semibold leading-tight">{value}</p>
+                  <p className="text-base font-semibold leading-tight">
+                    {value}
+                  </p>
                 </div>
               </div>
             ))}
@@ -310,31 +567,59 @@ export function SprintDetailClient({
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <CardTitle className="text-base">Team Progress</CardTitle>
-                <CardDescription>Tasks completed per team member</CardDescription>
+                <CardDescription>
+                  Tasks completed per team member
+                </CardDescription>
               </div>
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Search team member..." value={teamSearch}
-                  onChange={(e) => setTeamSearch(e.target.value)} className="pl-9" />
+                <Input
+                  placeholder="Search team member..."
+                  value={teamSearch}
+                  onChange={(e) => setTeamSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {teamMembers.map((m) => {
-                const pct = m.total > 0 ? Math.round((m.completed / m.total) * 100) : 0;
+                const pct =
+                  m.total > 0 ? Math.round((m.completed / m.total) * 100) : 0;
                 const r = 30;
                 const circ = 2 * Math.PI * r;
                 return (
-                  <div key={m.username} className="flex flex-col items-center text-center p-3 rounded-lg border border-border/60 hover:border-primary/40 hover:bg-muted/30 transition-colors">
+                  <div
+                    key={m.username}
+                    className="flex flex-col items-center text-center p-3 rounded-lg border border-border/60 hover:border-primary/40 hover:bg-muted/30 transition-colors"
+                  >
                     <div className="relative" style={{ width: 72, height: 72 }}>
                       <svg width={72} height={72} className="-rotate-90">
-                        <circle cx={36} cy={36} r={r} stroke="hsl(var(--muted))" strokeWidth={5} fill="none" />
-                        <circle cx={36} cy={36} r={r}
-                          stroke={pct === 100 ? "hsl(var(--success))" : "hsl(var(--primary))"}
-                          strokeWidth={5} fill="none"
-                          strokeDasharray={circ} strokeDashoffset={circ - (pct / 100) * circ}
-                          strokeLinecap="round" className="transition-all duration-500" />
+                        <circle
+                          cx={36}
+                          cy={36}
+                          r={r}
+                          stroke="hsl(var(--muted))"
+                          strokeWidth={5}
+                          fill="none"
+                        />
+                        <circle
+                          cx={36}
+                          cy={36}
+                          r={r}
+                          stroke={
+                            pct === 100
+                              ? "hsl(var(--success))"
+                              : "hsl(var(--primary))"
+                          }
+                          strokeWidth={5}
+                          fill="none"
+                          strokeDasharray={circ}
+                          strokeDashoffset={circ - (pct / 100) * circ}
+                          strokeLinecap="round"
+                          className="transition-all duration-500"
+                        />
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center">
                         <Avatar className="w-12 h-12">
@@ -344,8 +629,12 @@ export function SprintDetailClient({
                         </Avatar>
                       </div>
                     </div>
-                    <p className="text-sm font-medium mt-3 truncate w-full">{m.username}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{m.completed}/{m.total} • {pct}%</p>
+                    <p className="text-sm font-medium mt-3 truncate w-full">
+                      {m.username}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {m.completed}/{m.total} • {pct}%
+                    </p>
                   </div>
                 );
               })}
@@ -358,10 +647,14 @@ export function SprintDetailClient({
       <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <CardTitle className="text-base">Sprint Tasks ({issues.length})</CardTitle>
+            <CardTitle className="text-base">
+              Sprint Tasks ({issues.length})
+            </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="todo">To Do</SelectItem>
@@ -372,7 +665,9 @@ export function SprintDetailClient({
                 </SelectContent>
               </Select>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-32"><SelectValue placeholder="Priority" /></SelectTrigger>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Priority</SelectItem>
                   <SelectItem value="highest">Highest</SelectItem>
@@ -383,11 +678,15 @@ export function SprintDetailClient({
                 </SelectContent>
               </Select>
               <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-                <SelectTrigger className="w-40"><SelectValue placeholder="Assignee" /></SelectTrigger>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Assignee" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Assignees</SelectItem>
                   {uniqueAssignees.map((name) => (
-                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -397,35 +696,40 @@ export function SprintDetailClient({
         <CardContent>
           {filteredIssues.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              {issues.length === 0 ? "No issues in this sprint." : "No tasks match the current filters."}
+              {issues.length === 0
+                ? "No issues in this sprint."
+                : "No tasks match the current filters."}
             </p>
           ) : (
             <div className="space-y-2">
               {filteredIssues.map((issue) => (
                 <ViewTaskDialog
                   key={issue.id}
-                  task={{
-                    id: issue.id,
-                    title: issue.title,
-                    status: issue.status,
-                    priority: issue.priority as "low" | "medium" | "high",
-                    issueNumber: issue.issue_number,
-                    assignee: issue.assignee
-                      ? { name: issue.assignee.username, initials: getInitials(issue.assignee.username) }
-                      : undefined,
-                  }}
+                  issueId={issue.id}
                   trigger={
                     <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg hover:border-primary/30 hover:shadow-md transition-all duration-200 cursor-pointer">
                       <div>
-                        <p className="text-sm font-medium text-foreground">{issue.title}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {issue.title}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           TASK-{issue.issue_number}
                           {issue.assignee && ` • ${issue.assignee.username}`}
                         </p>
                       </div>
                       <div className="text-right text-xs text-muted-foreground">
-                        <p>Status: <span className="text-foreground font-medium capitalize">{issue.status.replace("-", " ")}</span></p>
-                        <p>Priority: <span className="text-foreground font-medium capitalize">{issue.priority}</span></p>
+                        <p>
+                          Status:{" "}
+                          <span className="text-foreground font-medium capitalize">
+                            {issue.status.replace("-", " ")}
+                          </span>
+                        </p>
+                        <p>
+                          Priority:{" "}
+                          <span className="text-foreground font-medium capitalize">
+                            {issue.priority}
+                          </span>
+                        </p>
                       </div>
                     </div>
                   }

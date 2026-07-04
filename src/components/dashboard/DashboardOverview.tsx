@@ -4,15 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  BarChart3,
-  Clock,
-  Users,
-  CheckCircle,
-  Flag,
-  Calendar,
-  Search,
-} from "lucide-react";
+import { Flag, Calendar, Search } from "lucide-react";
 import { NotesSection } from "@/components/dashboard/NotesSection";
 import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 import { Task } from "@/components/kanban/KanbanBoard";
@@ -25,117 +17,16 @@ import {
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 
-const allUserTasks: Task[] = [
-  {
-    id: "1",
-    title: "User Authentication System",
-    description: "Implement secure login and registration functionality",
-    status: "in-progress",
-    priority: "high",
-    assignee: { name: "Sarah Johnson", initials: "SJ" },
-    reporter: { name: "Mike Harrison", initials: "MH" },
-    project: "E-commerce Platform",
-    labels: ["Backend", "Security"],
-    dueDate: "2024-12-15",
-    comments: 3,
-  },
-  {
-    id: "2",
-    title: "Dashboard UI Components",
-    description: "Create reusable components for the admin dashboard",
-    status: "todo",
-    priority: "medium",
-    assignee: { name: "Sarah Johnson", initials: "SJ" },
-    reporter: { name: "Lisa Thompson", initials: "LT" },
-    project: "Dashboard Analytics",
-    labels: ["Frontend", "UI"],
-    dueDate: "2024-12-20",
-    comments: 5,
-  },
-  {
-    id: "3",
-    title: "API Documentation",
-    description: "Document all REST API endpoints with examples",
-    status: "qa",
-    priority: "low",
-    assignee: { name: "Sarah Johnson", initials: "SJ" },
-    reporter: { name: "Robert Kim", initials: "RK" },
-    project: "E-commerce Platform",
-    labels: ["Documentation"],
-    dueDate: "2024-12-18",
-    comments: 1,
-  },
-  {
-    id: "4",
-    title: "Performance Optimization",
-    description: "Optimize database queries and improve load times",
-    status: "pending",
-    priority: "high",
-    assignee: { name: "Sarah Johnson", initials: "SJ" },
-    reporter: { name: "Mike Harrison", initials: "MH" },
-    project: "E-commerce Platform",
-    labels: ["Backend", "Performance"],
-    dueDate: "2024-12-10",
-    comments: 2,
-  },
-  {
-    id: "5",
-    title: "User Onboarding Flow",
-    description: "Design and implement step-by-step user onboarding",
-    status: "done",
-    priority: "medium",
-    assignee: { name: "Sarah Johnson", initials: "SJ" },
-    reporter: { name: "Lisa Thompson", initials: "LT" },
-    project: "Mobile App Redesign",
-    labels: ["Frontend", "UX"],
-    dueDate: "2024-12-08",
-    comments: 4,
-  },
-  {
-    id: "6",
-    title: "Email Notification System",
-    description: "Set up automated email notifications for key events",
-    status: "todo",
-    priority: "medium",
-    assignee: { name: "Sarah Johnson", initials: "SJ" },
-    reporter: { name: "Robert Kim", initials: "RK" },
-    project: "Marketing Website",
-    labels: ["Backend"],
-    dueDate: "2024-12-22",
-    comments: 0,
-  },
-  {
-    id: "7",
-    title: "Mobile Responsive Design",
-    description: "Make the dashboard fully responsive for mobile devices",
-    status: "in-progress",
-    priority: "high",
-    assignee: { name: "Sarah Johnson", initials: "SJ" },
-    reporter: { name: "Mike Harrison", initials: "MH" },
-    project: "Mobile App Redesign",
-    labels: ["Frontend", "UI"],
-    dueDate: "2024-12-16",
-    comments: 7,
-  },
-  {
-    id: "8",
-    title: "Database Backup System",
-    description: "Implement automated daily database backups",
-    status: "todo",
-    priority: "low",
-    assignee: { name: "Sarah Johnson", initials: "SJ" },
-    reporter: { name: "Lisa Thompson", initials: "LT" },
-    project: "E-commerce Platform",
-    labels: ["Backend", "DevOps"],
-    dueDate: "2024-12-25",
-    comments: 1,
-  },
-];
+interface DashboardOverviewProps {
+  tasks: Task[];
+  username: string;
+}
 
-export function DashboardOverview() {
+export function DashboardOverview({ tasks, username }: DashboardOverviewProps) {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [reporterFilter, setReporterFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [search, setSearch] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("none");
   const [sortByDeadline, setSortByDeadline] = useState<string>("none");
   const [displayedTasks, setDisplayedTasks] = useState(5);
@@ -143,6 +34,7 @@ export function DashboardOverview() {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high":
+      case "highest":
         return "border-destructive text-destructive";
       case "medium":
         return "border-warning text-warning";
@@ -188,50 +80,62 @@ export function DashboardOverview() {
   };
 
   const getFilteredAndSortedTasks = () => {
-    let filtered = allUserTasks;
+    let filtered = tasks;
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter((t) => t.title.toLowerCase().includes(q));
+    }
 
     if (projectFilter !== "all") {
-      filtered = filtered.filter((task) => task.project === projectFilter);
+      filtered = filtered.filter((t) => t.project === projectFilter);
     }
 
     if (reporterFilter !== "all") {
-      filtered = filtered.filter(
-        (task) => task.reporter?.name === reporterFilter,
-      );
+      filtered = filtered.filter((t) => t.reporter?.name === reporterFilter);
     }
 
     if (statusFilter !== "all") {
-      filtered = filtered.filter((task) => task.status === statusFilter);
+      filtered = filtered.filter((t) => t.status === statusFilter);
     }
 
-    // Sort tasks
     let sorted = [...filtered];
 
-    // Priority sorting
     if (sortBy === "priority-high") {
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      const order: Record<string, number> = {
+        highest: 0,
+        high: 1,
+        medium: 2,
+        low: 3,
+        none: 4,
+      };
       sorted = sorted.sort(
-        (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority],
+        (a, b) => (order[a.priority] ?? 5) - (order[b.priority] ?? 5),
       );
     } else if (sortBy === "priority-low") {
-      const priorityOrder = { high: 2, medium: 1, low: 0 };
+      const order: Record<string, number> = {
+        highest: 4,
+        high: 3,
+        medium: 2,
+        low: 1,
+        none: 0,
+      };
       sorted = sorted.sort(
-        (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority],
+        (a, b) => (order[a.priority] ?? 5) - (order[b.priority] ?? 5),
       );
     }
 
-    // Deadline sorting
     if (sortByDeadline === "deadline-asc") {
       sorted = sorted.sort(
         (a, b) =>
-          new Date(a.dueDate || "").getTime() -
-          new Date(b.dueDate || "").getTime(),
+          new Date(a.dueDate || "9999").getTime() -
+          new Date(b.dueDate || "9999").getTime(),
       );
     } else if (sortByDeadline === "deadline-desc") {
       sorted = sorted.sort(
         (a, b) =>
-          new Date(b.dueDate || "").getTime() -
-          new Date(a.dueDate || "").getTime(),
+          new Date(b.dueDate || "0").getTime() -
+          new Date(a.dueDate || "0").getTime(),
       );
     }
 
@@ -243,32 +147,28 @@ export function DashboardOverview() {
   const hasMoreTasks = filteredTasks.length > displayedTasks;
 
   const taskCounts = {
-    total: allUserTasks.length,
-    todo: allUserTasks.filter((t) => t.status === "todo").length,
-    inProgress: allUserTasks.filter((t) => t.status === "in-progress").length,
-    qa: allUserTasks.filter((t) => t.status === "qa").length,
-    pending: allUserTasks.filter((t) => t.status === "pending").length,
-    done: allUserTasks.filter((t) => t.status === "done").length,
+    total: tasks.length,
+    todo: tasks.filter((t) => t.status === "todo").length,
+    inProgress: tasks.filter((t) => t.status === "in-progress").length,
+    done: tasks.filter((t) => t.status === "done").length,
   };
 
-  const uniqueProjects = Array.from(
-    new Set(allUserTasks.map((t) => t.project).filter(Boolean)),
-  ) as string[];
-  const uniqueReporters = Array.from(
-    new Set(allUserTasks.map((t) => t.reporter?.name).filter(Boolean)),
-  ) as string[];
+  const uniqueProjects = [
+    ...new Set(tasks.map((t) => t.project).filter(Boolean)),
+  ] as string[];
+  const uniqueReporters = [
+    ...new Set(tasks.map((t) => t.reporter?.name).filter(Boolean)),
+  ] as string[];
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-foreground">
-          Welcome back, Sarah!
+          Welcome back, {username}!
         </h1>
       </div>
 
       <div className="w-full">
-        {/* Your Work */}
         <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
           <CardHeader className="pb-4 border-b border-border/60">
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -300,10 +200,17 @@ export function DashboardOverview() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
-            {/* Search Bar */}
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input placeholder="Search tickets..." className="pl-10" />
+              <Input
+                placeholder="Search tickets..."
+                className="pl-10"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setDisplayedTasks(5);
+                }}
+              />
             </div>
 
             <div className="flex items-center gap-4 flex-wrap">
@@ -311,7 +218,13 @@ export function DashboardOverview() {
                 <span className="text-sm font-medium text-foreground">
                   Filters:
                 </span>
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                <Select
+                  value={projectFilter}
+                  onValueChange={(v) => {
+                    setProjectFilter(v);
+                    setDisplayedTasks(5);
+                  }}
+                >
                   <SelectTrigger className="w-40">
                     <SelectValue placeholder="Project" />
                   </SelectTrigger>
@@ -324,7 +237,13 @@ export function DashboardOverview() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => {
+                    setStatusFilter(v);
+                    setDisplayedTasks(5);
+                  }}
+                >
                   <SelectTrigger className="w-40">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -339,7 +258,10 @@ export function DashboardOverview() {
                 </Select>
                 <SearchableSelect
                   value={reporterFilter}
-                  onValueChange={setReporterFilter}
+                  onValueChange={(v) => {
+                    setReporterFilter(v);
+                    setDisplayedTasks(5);
+                  }}
                   placeholder="Reporter"
                   searchPlaceholder="Search reporters..."
                   triggerClassName="w-40"
@@ -448,7 +370,7 @@ export function DashboardOverview() {
                       </div>
                     </div>
                   }
-                  task={task}
+                  issueId={task.id}
                 />
               ))}
               {hasMoreTasks && (
@@ -469,8 +391,6 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Notes and Links Section */}
       <NotesSection />
     </div>
   );

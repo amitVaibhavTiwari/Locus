@@ -1,5 +1,11 @@
 import { notFound, redirect } from "next/navigation";
-import { getSessionUser, getActiveOrg, getProject, getProjectSprints, getSprintIssues } from "@/lib/dal";
+import {
+  getSessionUser,
+  getActiveOrg,
+  getProject,
+  getProjectSprints,
+  getSprintIssues,
+} from "@/lib/dal";
 import { SprintDetailClient } from "./SprintDetailClient";
 
 export default async function SprintDetailPage({
@@ -23,17 +29,12 @@ export default async function SprintDetailPage({
   const sprint = allSprints.find((s) => s.id === sprintId);
   if (!sprint) notFound();
 
-  const hasNextSprint = allSprints.some(
-    (s) => s.status === "planned" && s.id !== sprintId,
-  );
-
   return (
     <SprintDetailClient
       projectId={projectId}
       projectName={project.name}
       sprint={sprint}
       issues={issues}
-      hasNextSprint={hasNextSprint}
     />
   );
 }

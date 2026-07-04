@@ -16,6 +16,7 @@ async function getProjectMembership(projectId: string, userId: string) {
 export async function addProjectMember(
   projectId: string,
   userId: string,
+  role: "manager" | "member" = "member",
 ): Promise<{ error?: string }> {
   const session = await verifySession();
 
@@ -35,7 +36,7 @@ export async function addProjectMember(
       id: randomUUID(),
       project_id: projectId,
       user_id: userId,
-      role: "member",
+      role,
       joined_at: new Date().toISOString(),
     })
     .execute();

@@ -1,5 +1,5 @@
-"use client";
-import React from "react";
+﻿"use client";
+import React, { useEffect, useRef } from "react";
 import { Task } from "@/components/kanban/KanbanBoard";
 import {
   Table,
@@ -21,6 +21,8 @@ import {
 import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 import { format } from "date-fns";
 import { SubGroupBy, groupTasks, subGroupLabels } from "@/lib/subGroup";
+import { Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const DEFAULT_STATUSES = [
   { key: "todo", name: "To Do" },
@@ -35,6 +37,10 @@ interface ProjectTableViewProps {
   onStatusChange: (taskId: string, newStatus: Task["status"]) => void;
   subGroupBy?: SubGroupBy;
   boardStatuses?: Array<{ key: string; name: string }>;
+  hasMore?: boolean;
+  isLoading?: boolean;
+  onLoadMore?: () => void;
+  scrollRoot?: React.RefObject<HTMLDivElement | null>;
 }
 
 const getPriorityBorderColor = (priority: string) => {
@@ -55,9 +61,36 @@ export function ProjectTableView({
   onStatusChange,
   subGroupBy = "none",
   boardStatuses,
+  hasMore,
+  isLoading,
+  onLoadMore,
+  scrollRoot,
 }: ProjectTableViewProps) {
   const statuses =
-    boardStatuses && boardStatuses.length > 0 ? boardStatuses : DEFAULT_STATUSES;
+    boardStatuses && boardStatuses.length > 0
+      ? boardStatuses
+      : DEFAULT_STATUSES;
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!hasMore || !sentinelRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isLoading) {
+          onLoadMore?.();
+        }
+      },
+      {
+        root: scrollRoot?.current ?? null,
+        rootMargin: "120px",
+      },
+    );
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, onLoadMore, scrollRoot]);
 
   const groups = groupTasks(tasks, subGroupBy);
   const grouped = subGroupBy !== "none";
@@ -136,7 +169,7 @@ export function ProjectTableView({
         </div>
       )}
       <div className="flex">
-        <div className="min-w-[300px] max-w-[300px] border-r bg-card dark:bg-[hsl(var(--card)/0.7)] z-10 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.1)]">
+        <div className="min-w-75 max-w-75 border-r bg-card dark:bg-[hsl(var(--card)/0.7)] z-10 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.1)]">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 dark:bg-muted/40 h-12">
@@ -154,8 +187,7 @@ export function ProjectTableView({
                 ) : (
                   <ViewTaskDialog
                     key={row.task.id}
-                    task={row.task}
-                    boardStatuses={statuses}
+                    issueId={row.task.id}
                     trigger={
                       <TableRow className="hover:bg-muted/30 dark:hover:bg-muted/20 h-14 cursor-pointer">
                         <TableCell className="font-medium h-14 py-0">
@@ -166,37 +198,45 @@ export function ProjectTableView({
                   />
                 ),
               )}
+              {isLoading &&
+                tasks.length === 0 &&
+                Array.from({ length: 10 }).map((_, i) => (
+                  <TableRow key={`sk-left-${i}`} className="h-14">
+                    <TableCell className="h-14 py-0">
+                      <Skeleton className="h-4 w-4/5" />
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </div>
 
-        {/* Scrollable Columns */}
         <div className="flex-1 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 dark:bg-muted/40 h-12">
-                <TableHead className="font-semibold text-foreground min-w-[140px] h-12">
+                <TableHead className="font-semibold text-foreground min-w-35 h-12">
                   Status
                 </TableHead>
-                <TableHead className="font-semibold text-foreground min-w-[100px] h-12">
+                <TableHead className="font-semibold text-foreground min-w-25 h-12">
                   Priority
                 </TableHead>
-                <TableHead className="font-semibold text-foreground min-w-[150px] h-12">
+                <TableHead className="font-semibold text-foreground min-w-37.5 h-12">
                   Assignee
                 </TableHead>
-                <TableHead className="font-semibold text-foreground min-w-[150px] h-12">
+                <TableHead className="font-semibold text-foreground min-w-37.5 h-12">
                   Reporter
                 </TableHead>
-                <TableHead className="font-semibold text-foreground min-w-[120px] h-12">
+                <TableHead className="font-semibold text-foreground min-w-30 h-12">
                   Due Date
                 </TableHead>
-                <TableHead className="font-semibold text-foreground min-w-[120px] h-12">
+                <TableHead className="font-semibold text-foreground min-w-30 h-12">
                   Created On
                 </TableHead>
-                <TableHead className="font-semibold text-foreground min-w-[200px] h-12">
+                <TableHead className="font-semibold text-foreground min-w-50 h-12">
                   Tags
                 </TableHead>
-                <TableHead className="font-semibold text-foreground min-w-[150px] h-12">
+                <TableHead className="font-semibold text-foreground min-w-37.5 h-12">
                   Epic
                 </TableHead>
               </TableRow>
@@ -210,11 +250,9 @@ export function ProjectTableView({
                 ) : (
                   <ViewTaskDialog
                     key={row.task.id}
-                    task={row.task}
-                    boardStatuses={statuses}
+                    issueId={row.task.id}
                     trigger={
                       <TableRow className="hover:bg-muted/30 dark:hover:bg-muted/20 h-14 cursor-pointer">
-                        {/* Status */}
                         <TableCell
                           className="h-14 py-0"
                           onClick={(e) => e.stopPropagation()}
@@ -222,10 +260,13 @@ export function ProjectTableView({
                           <Select
                             value={row.task.status}
                             onValueChange={(value) =>
-                              onStatusChange(row.task.id, value as Task["status"])
+                              onStatusChange(
+                                row.task.id,
+                                value as Task["status"],
+                              )
                             }
                           >
-                            <SelectTrigger className="w-[130px] h-8 text-xs">
+                            <SelectTrigger className="w-32.5 h-8 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -279,25 +320,35 @@ export function ProjectTableView({
                               </span>
                             </div>
                           ) : (
-                            <span className="text-muted-foreground text-sm">&mdash;</span>
+                            <span className="text-muted-foreground text-sm">
+                              &mdash;
+                            </span>
                           )}
                         </TableCell>
 
                         <TableCell className="h-14 py-0">
                           {row.task.dueDate ? (
                             <span className="text-sm text-foreground">
-                              {format(new Date(row.task.dueDate), "MMM d, yyyy")}
+                              {format(
+                                new Date(row.task.dueDate),
+                                "MMM d, yyyy",
+                              )}
                             </span>
                           ) : (
-                            <span className="text-muted-foreground text-sm">&mdash;</span>
+                            <span className="text-muted-foreground text-sm">
+                              &mdash;
+                            </span>
                           )}
                         </TableCell>
 
                         <TableCell className="h-14 py-0">
                           <span className="text-sm text-muted-foreground">
                             {row.task.createdAt
-                              ? format(new Date(row.task.createdAt), "MMM d, yyyy")
-                              : "&mdash;"}
+                              ? format(
+                                  new Date(row.task.createdAt),
+                                  "MMM d, yyyy",
+                                )
+                              : "—"}
                           </span>
                         </TableCell>
 
@@ -313,7 +364,9 @@ export function ProjectTableView({
                               </Badge>
                             ))}
                             {!row.task.labels?.length && (
-                              <span className="text-muted-foreground text-sm">&mdash;</span>
+                              <span className="text-muted-foreground text-sm">
+                                &mdash;
+                              </span>
                             )}
                           </div>
                         </TableCell>
@@ -327,7 +380,9 @@ export function ProjectTableView({
                               {row.task.epicName}
                             </Badge>
                           ) : (
-                            <span className="text-muted-foreground text-sm">&mdash;</span>
+                            <span className="text-muted-foreground text-sm">
+                              &mdash;
+                            </span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -335,10 +390,53 @@ export function ProjectTableView({
                   />
                 ),
               )}
+              {isLoading &&
+                tasks.length === 0 &&
+                Array.from({ length: 10 }).map((_, i) => (
+                  <TableRow key={`sk-right-${i}`} className="h-14">
+                    <TableCell className="h-14 py-0">
+                      <Skeleton className="h-8 w-32" />
+                    </TableCell>
+                    <TableCell className="h-14 py-0">
+                      <Skeleton className="h-5 w-14 rounded-full" />
+                    </TableCell>
+                    <TableCell className="h-14 py-0">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-6 w-6 rounded-full" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="h-14 py-0">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-6 w-6 rounded-full" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="h-14 py-0">
+                      <Skeleton className="h-3 w-20" />
+                    </TableCell>
+                    <TableCell className="h-14 py-0">
+                      <Skeleton className="h-3 w-20" />
+                    </TableCell>
+                    <TableCell className="h-14 py-0">
+                      <Skeleton className="h-5 w-12 rounded-full" />
+                    </TableCell>
+                    <TableCell className="h-14 py-0">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </div>
       </div>
+
+      {isLoading && tasks.length > 0 && (
+        <div className="flex justify-center py-4 border-t border-border">
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      {hasMore && <div ref={sentinelRef} className="h-1" />}
     </div>
   );
 }

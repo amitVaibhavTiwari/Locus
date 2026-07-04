@@ -11,10 +11,9 @@ import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 interface TaskCardProps {
   task: Task;
   isDragging?: boolean;
-  boardStatuses?: Array<{ key: string; name: string }>;
 }
 
-export function TaskCard({ task, isDragging = false, boardStatuses }: TaskCardProps) {
+export function TaskCard({ task, isDragging = false }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -48,8 +47,7 @@ export function TaskCard({ task, isDragging = false, boardStatuses }: TaskCardPr
 
   return (
     <ViewTaskDialog
-      task={task}
-      boardStatuses={boardStatuses}
+      issueId={task.id}
       trigger={
         <Card
           ref={setNodeRef}
@@ -63,14 +61,12 @@ export function TaskCard({ task, isDragging = false, boardStatuses }: TaskCardPr
           }`}
         >
           <CardContent className="p-3">
-            {/* Header */}
             <div className="mb-2">
               <h4 className="font-semibold text-sm text-foreground line-clamp-2">
                 {task.title}
               </h4>
             </div>
 
-            {/* Labels */}
             {task.labels && task.labels.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2">
                 {task.labels.map((label, index) => (
@@ -85,10 +81,8 @@ export function TaskCard({ task, isDragging = false, boardStatuses }: TaskCardPr
               </div>
             )}
 
-            {/* Footer */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                {/* Due Date */}
                 {task.dueDate && (
                   <div className="flex items-center gap-1">
                     <Calendar className="w-3 h-3 flex-shrink-0" />
@@ -107,7 +101,6 @@ export function TaskCard({ task, isDragging = false, boardStatuses }: TaskCardPr
                   </div>
                 )}
 
-                {/* Priority */}
                 <div className="flex items-center gap-1">
                   <Flag
                     className={`w-3 h-3 ${getPriorityColor(task.priority)}`}
@@ -120,7 +113,6 @@ export function TaskCard({ task, isDragging = false, boardStatuses }: TaskCardPr
                 </div>
               </div>
 
-              {/* Assignee */}
               {task.assignee && (
                 <Avatar className="w-6 h-6 flex-shrink-0">
                   <AvatarImage src={task.assignee.avatar} />

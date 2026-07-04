@@ -30,9 +30,11 @@ interface MainLayoutProps {
   children: React.ReactNode;
   user: SessionUser;
   orgName: string;
+  activeOrgId: string;
   brandColor: string | null;
   userRole: "owner" | "admin" | "member";
   pinnedProjects: { id: string; name: string }[];
+  workspaces: { id: string; name: string; brandColor: string | null }[];
 }
 
 function getInitials(name: string) {
@@ -123,9 +125,11 @@ export function MainLayout({
   children,
   user,
   orgName,
+  activeOrgId,
   brandColor,
   userRole,
   pinnedProjects,
+  workspaces,
 }: MainLayoutProps) {
   useEffect(() => {
     if (!brandColor) return;
@@ -144,8 +148,10 @@ export function MainLayout({
       <SidebarProvider defaultOpen={true}>
         <AppSidebar
           workspaceName={orgName}
+          activeOrgId={activeOrgId}
           userRole={userRole}
           pinnedProjects={pinnedProjects}
+          workspaces={workspaces}
         />
         <AppContent user={user}>{children}</AppContent>
       </SidebarProvider>

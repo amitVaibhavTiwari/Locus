@@ -1,27 +1,9 @@
-import {
-  getActiveOrg,
-  getOrgMembers,
-  getCurrentUserOrgRole,
-  verifySession,
-} from "@/lib/dal";
-import { TeamClient, TeamMember } from "./TeamClient";
+import { redirect } from "next/navigation";
+import { getActiveOrg, getCurrentUserOrgRole, verifySession } from "@/lib/dal";
+import { db } from "@/lib/db";
+import { TeamClient } from "./TeamClient";
 
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
-function mapRole(
-  role: "owner" | "admin" | "member",
-): "Super Admin" | "Admin" | "Member" {
-  if (role === "owner") return "Super Admin";
-  if (role === "admin") return "Admin";
-  return "Member";
-}
+const PAGE_SIZE = 15;
 
 export default async function TeamPage() {
   const [session, org, userRole] = await Promise.all([
@@ -29,25 +11,43 @@ export default async function TeamPage() {
     getActiveOrg(),
     getCurrentUserOrgRole(),
   ]);
-  if (!org) return null;
+  if (!org) redirect("/onboarding/workspace");
 
-  const rawMembers = await getOrgMembers(org.id);
   const allowAdminInvite = (org.workspacePrefs?.allow_admin_invite ?? 0) === 1;
 
-  const members: TeamMember[] = rawMembers.map((m) => ({
-    id: m.memberId,
-    userId: m.userId,
-    name: m.username,
-    email: m.email,
-    role: mapRole(m.role),
-    dbRole: m.role,
-    initials: getInitials(m.username),
-    joinDate: String(m.joined_at),
-  }));
+  const baseQuery = db
+    .selectFrom("organization_members")
+    .innerJoin("users", "users.id", "organization_members.user_id")
+    .where("organization_members.organization_id", "=", org.id);
+
+  const [firstBatch, countRow] = await Promise.all([
+    baseQuery
+      .select([
+        "organization_members.id as memberId",
+        "organization_members.user_id as userId",
+        "organization_members.role",
+        "organization_members.joined_at",
+        "users.username",
+        "users.email",
+        "users.avatar_url",
+      ])
+      .orderBy("organization_members.joined_at", "asc")
+      .limit(PAGE_SIZE + 1)
+      .execute(),
+    baseQuery
+      .select((eb) => eb.fn.countAll<number>().as("total"))
+      .executeTakeFirst(),
+  ]);
+
+  const hasMore = firstBatch.length > PAGE_SIZE;
+  const members = firstBatch.slice(0, PAGE_SIZE);
+  const initialTotal = Number(countRow?.total ?? 0);
 
   return (
     <TeamClient
       initialMembers={members}
+      initialHasMore={hasMore}
+      initialTotal={initialTotal}
       currentUserId={session.user.id}
       currentUserRole={userRole ?? "member"}
       allowAdminInvite={allowAdminInvite}

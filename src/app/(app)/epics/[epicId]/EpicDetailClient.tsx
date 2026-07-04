@@ -1,7 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -11,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 import { updateEpicStatus } from "@/actions/epics";
@@ -52,7 +50,6 @@ interface Epic {
 interface EpicDetailClientProps {
   epic: Epic;
   issues: Issue[];
-  boardStatuses: Array<{ key: string; name: string }>;
 }
 
 function getInitials(name: string) {
@@ -83,11 +80,7 @@ const STATUS_BADGE: Record<string, string> = {
   pending: "bg-orange-500/10 text-orange-500 border-orange-500/30",
 };
 
-export function EpicDetailClient({
-  epic,
-  issues,
-  boardStatuses,
-}: EpicDetailClientProps) {
+export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [, startTransition] = useTransition();
@@ -207,32 +200,7 @@ export function EpicDetailClient({
             {issues.map((issue) => (
               <ViewTaskDialog
                 key={issue.id}
-                boardStatuses={boardStatuses}
-                task={{
-                  id: issue.id,
-                  title: issue.title,
-                  description: issue.description ?? undefined,
-                  status: issue.status,
-                  priority: issue.priority as "low" | "medium" | "high",
-                  issueNumber: issue.issue_number,
-                  dueDate: issue.due_date ?? undefined,
-                  createdAt: issue.created_at,
-                  labels: issue.labels,
-                  epicName: epic.name,
-                  assignee: issue.assignee
-                    ? {
-                        name: issue.assignee.username,
-                        avatar: issue.assignee.avatar_url ?? undefined,
-                        initials: getInitials(issue.assignee.username),
-                      }
-                    : undefined,
-                  reporter: issue.reporter
-                    ? {
-                        name: issue.reporter.username,
-                        initials: getInitials(issue.reporter.username),
-                      }
-                    : undefined,
-                }}
+                issueId={issue.id}
                 trigger={
                   <div className="flex items-center justify-between p-4 bg-card border border-border/50 rounded-md hover:bg-muted/30 cursor-pointer transition-colors">
                     <div className="flex items-center gap-4 flex-1 min-w-0">

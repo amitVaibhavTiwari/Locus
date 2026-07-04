@@ -127,7 +127,43 @@ export async function inviteTeammates(
     }
   }
 
+  revalidatePath("/invites");
   return { successCount };
+}
+
+export async function cancelInvite(
+  inviteId: string,
+): Promise<{ error?: string } | undefined> {
+  const session = await verifySession();
+
+  const prefs = await db
+    .selectFrom("user_preferences")
+    .where("user_id", "=", session.user.id)
+    .select(["active_organization_id"])
+    .executeTakeFirst();
+
+  if (!prefs?.active_organization_id) return { error: "No active workspace" };
+
+  const callerMembership = await db
+    .selectFrom("organization_members")
+    .where("organization_id", "=", prefs.active_organization_id)
+    .where("user_id", "=", session.user.id)
+    .select(["role"])
+    .executeTakeFirst();
+
+  if (callerMembership?.role !== "owner") {
+    return { error: "Only workspace owners can cancel invitations" };
+  }
+
+  await db
+    .deleteFrom("organization_invitations")
+    .where("id", "=", inviteId)
+    .where("organization_id", "=", prefs.active_organization_id)
+    .where("accepted_at", "is", null)
+    .execute();
+
+  revalidatePath("/invites");
+  return undefined;
 }
 
 export async function removeMember(

@@ -6,6 +6,7 @@ import {
   getActiveOrg,
   getCurrentUserOrgRole,
   getPinnedProjects,
+  getUserWorkspaces,
 } from "@/lib/dal";
 
 export default async function AppLayout({
@@ -13,10 +14,11 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [user, org, userRole] = await Promise.all([
+  const [user, org, userRole, workspaces] = await Promise.all([
     getSessionUser(),
     getActiveOrg(),
     getCurrentUserOrgRole(),
+    getUserWorkspaces(),
   ]);
   if (!org) redirect("/onboarding/workspace");
 
@@ -29,9 +31,11 @@ export default async function AppLayout({
     <MainLayout
       user={user}
       orgName={orgName}
+      activeOrgId={org.id}
       brandColor={brandColor}
       userRole={userRole ?? "member"}
       pinnedProjects={pinnedProjects}
+      workspaces={workspaces}
     >
       {children}
     </MainLayout>

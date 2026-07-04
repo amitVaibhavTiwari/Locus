@@ -4,7 +4,6 @@ import {
   getActiveOrg,
   getEpic,
   getEpicIssues,
-  getProjectBoard,
 } from "@/lib/dal";
 import { EpicDetailClient } from "./EpicDetailClient";
 
@@ -21,20 +20,7 @@ export default async function EpicDetailPage({
   const epic = await getEpic(epicId);
   if (!epic) notFound();
 
-  const [issues, board] = await Promise.all([
-    getEpicIssues(epicId),
-    getProjectBoard(epic.project_id),
-  ]);
+  const issues = await getEpicIssues(epicId);
 
-  const boardStatuses = (board?.columns ?? [])
-    .filter((c) => c.key)
-    .map((c) => ({ key: c.key!, name: c.name }));
-
-  return (
-    <EpicDetailClient
-      epic={epic}
-      issues={issues}
-      boardStatuses={boardStatuses}
-    />
-  );
+  return <EpicDetailClient epic={epic} issues={issues} />;
 }

@@ -234,6 +234,17 @@ export interface AttachmentsTable {
   created_at: string;
 }
 
+export interface IssueCommentsTable {
+  id: string;
+  issue_id: string;
+  organization_id: string;
+  user_id: string;
+  body: string;
+  edited_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Database {
   users: UsersTable;
   accounts: AccountsTable;
@@ -256,4 +267,5 @@ export interface Database {
   issue_labels: IssueLabelsTable;
   activities: ActivitiesTable;
   attachments: AttachmentsTable;
+  issue_comments: IssueCommentsTable;
 }

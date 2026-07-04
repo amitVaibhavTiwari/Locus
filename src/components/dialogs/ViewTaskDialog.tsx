@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
   Calendar,
@@ -42,8 +43,26 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { moveIssue } from "@/actions/issues";
+import { formatDate, formatDateTime } from "@/lib/date";
 
-type TaskPriority = "low" | "medium" | "high";
+type TaskPriority = "highest" | "high" | "medium" | "low" | "none";
+
+interface TaskData {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: TaskPriority;
+  issue_number: number;
+  created_at: string;
+  due_date: string | null;
+  assignee: { name: string; initials: string } | null;
+  reporter: { name: string; initials: string } | null;
+  labels: string[];
+  epic_name: string | null;
+  parentTask: { id: string; title: string } | null;
+  boardStatuses: Array<{ key: string; name: string }>;
+}
 
 interface Activity {
   id: string;
@@ -55,6 +74,17 @@ interface Activity {
   avatar_url: string | null;
 }
 
+interface Comment {
+  id: string;
+  body: string;
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  edited_at: string | null;
+  created_at: string;
+  is_own: boolean;
+}
+
 interface Attachment {
   id: string;
   filename: string;
@@ -62,7 +92,7 @@ interface Attachment {
   size: number;
   created_at: string;
   uploader_name: string;
-  url: string; // signed URL, valid for 1 hour — never persisted
+  url: string;
 }
 
 const DEFAULT_STATUSES = [
@@ -75,44 +105,27 @@ const DEFAULT_STATUSES = [
 
 interface ViewTaskDialogProps {
   trigger: React.ReactNode;
-  task?: {
-    id?: string;
-    title?: string;
-    description?: string;
-    status?: string;
-    priority?: TaskPriority;
-    assignee?: { name: string; avatar?: string; initials: string };
-    reporter?: { name: string; initials: string };
-    dueDate?: string;
-    issueNumber?: number;
-    createdAt?: string;
-    labels?: string[];
-    epicName?: string | null;
-    parentTask?: { id: string; title: string };
-  };
-  boardStatuses?: Array<{ key: string; name: string }>;
+  issueId: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
 export function ViewTaskDialog({
   trigger,
-  task,
-  boardStatuses,
+  issueId,
   open: externalOpen,
   onOpenChange: externalOnOpenChange,
 }: ViewTaskDialogProps) {
-  const statuses =
-    boardStatuses && boardStatuses.length > 0
-      ? boardStatuses
-      : DEFAULT_STATUSES;
   const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen =
     externalOnOpenChange !== undefined ? externalOnOpenChange : setInternalOpen;
+
+  const [taskData, setTaskData] = useState<TaskData | null>(null);
+  const [taskLoading, setTaskLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("description");
-  const [status, setStatus] = useState<string>(task?.status ?? "todo");
+  const [status, setStatus] = useState<string>("todo");
   const [comment, setComment] = useState("");
   const [viewingParentTask, setViewingParentTask] = useState(false);
   const [viewingSubtaskId, setViewingSubtaskId] = useState<string | null>(null);
@@ -123,41 +136,87 @@ export function ViewTaskDialog({
   const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const [showCommentBox, setShowCommentBox] = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, startTransition] = useTransition();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (activeTab !== "history" || !task?.id || activitiesLoaded) return;
-    fetch(`/api/issues/${task.id}/activities`)
+    if (!open || !issueId) return;
+    setTaskLoading(true);
+    setTaskData(null);
+    setActivitiesLoaded(false);
+    setAttachmentsLoaded(false);
+    setCommentsLoaded(false);
+    setActivities([]);
+    setAttachments([]);
+    setComments([]);
+    setShowCommentBox(false);
+    setComment("");
+    setActiveTab("description");
+
+    fetch(`/api/issues/${issueId}`)
+      .then((r) => r.json())
+      .then((data: TaskData) => {
+        setTaskData(data);
+        setStatus(data.status ?? "todo");
+      })
+      .catch(() => {
+        toast({ title: "Failed to load task", variant: "destructive" });
+      })
+      .finally(() => setTaskLoading(false));
+  }, [open, issueId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activeTab !== "history" || !issueId || activitiesLoaded) return;
+    fetch(`/api/issues/${issueId}/activities`)
       .then((r) => r.json())
       .then((data: Activity[]) => {
         setActivities(data);
         setActivitiesLoaded(true);
       })
       .catch(() => setActivitiesLoaded(true));
-  }, [activeTab, task?.id, activitiesLoaded]);
+  }, [activeTab, issueId, activitiesLoaded]);
 
   useEffect(() => {
-    if (activeTab !== "attachments" || !task?.id || attachmentsLoaded) return;
-    fetch(`/api/attachments/${task.id}`)
+    if (activeTab !== "attachments" || !issueId || attachmentsLoaded) return;
+    fetch(`/api/attachments/${issueId}`)
       .then((r) => r.json())
       .then((data: Attachment[]) => {
         setAttachments(data);
         setAttachmentsLoaded(true);
       })
       .catch(() => setAttachmentsLoaded(true));
-  }, [activeTab, task?.id, attachmentsLoaded]);
+  }, [activeTab, issueId, attachmentsLoaded]);
+
+  useEffect(() => {
+    if (activeTab !== "comments" || !issueId || commentsLoaded) return;
+    fetch(`/api/issues/${issueId}/comments`)
+      .then((r) => r.json())
+      .then((data: { comments: Comment[]; currentUsername: string | null }) => {
+        setComments(data.comments ?? []);
+        setCurrentUsername(data.currentUsername);
+        setCommentsLoaded(true);
+      })
+      .catch(() => setCommentsLoaded(true));
+  }, [activeTab, issueId, commentsLoaded]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !task?.id) return;
+    if (!file) return;
     e.target.value = "";
 
     setUploading(true);
     const body = new FormData();
     body.append("file", file);
-    body.append("issueId", task.id);
+    body.append("issueId", issueId);
 
     try {
       const res = await fetch("/api/upload", { method: "POST", body });
@@ -180,11 +239,10 @@ export function ViewTaskDialog({
   };
 
   const handleDeleteAttachment = async (attachmentId: string) => {
-    if (!task?.id) return;
     setDeletingId(attachmentId);
     try {
       const res = await fetch(
-        `/api/attachments/${task.id}?attachmentId=${attachmentId}`,
+        `/api/attachments/${issueId}?attachmentId=${attachmentId}`,
         { method: "DELETE" },
       );
       if (!res.ok) throw new Error("Delete failed");
@@ -197,22 +255,27 @@ export function ViewTaskDialog({
     }
   };
 
-  const priority = task?.priority ?? "medium";
+  const statuses =
+    taskData?.boardStatuses && taskData.boardStatuses.length > 0
+      ? taskData.boardStatuses
+      : DEFAULT_STATUSES;
 
-  const displayId = task?.issueNumber
-    ? `TASK-${task.issueNumber}`
-    : (task?.id?.slice(0, 8) ?? "TASK-???");
+  const priority = (taskData?.priority ?? "medium") as TaskPriority;
 
-  const formattedDueDate = task?.dueDate
-    ? new Date(task.dueDate).toLocaleDateString(undefined, {
+  const displayId = taskData?.issue_number
+    ? `TASK-${taskData.issue_number}`
+    : issueId.slice(0, 8);
+
+  const formattedDueDate = taskData?.due_date
+    ? formatDate(taskData.due_date, {
         month: "long",
         day: "numeric",
         year: "numeric",
       })
     : null;
 
-  const formattedCreatedAt = task?.createdAt
-    ? new Date(task.createdAt).toLocaleDateString(undefined, {
+  const formattedCreatedAt = taskData?.created_at
+    ? formatDateTime(taskData.created_at, {
         month: "long",
         day: "numeric",
         year: "numeric",
@@ -221,22 +284,54 @@ export function ViewTaskDialog({
 
   const handleStatusChange = (value: string) => {
     setStatus(value);
-    if (task?.id) {
-      startTransition(async () => {
-        await moveIssue(task.id!, value);
-        router.refresh();
-      });
-    }
+    startTransition(async () => {
+      await moveIssue(issueId, value);
+      router.refresh();
+    });
     toast({ title: "Status updated" });
   };
 
-  const handleAddComment = () => {
-    if (comment.trim()) {
-      toast({
-        title: "Comment added",
-        description: "Your comment has been posted",
+  const handleAddComment = async () => {
+    if (!comment.trim()) return;
+    setSubmittingComment(true);
+    try {
+      const res = await fetch(`/api/issues/${issueId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: comment.trim() }),
       });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({}));
+        throw new Error(error ?? "Failed to post comment");
+      }
+      const newComment: Comment = await res.json();
+      setComments((prev) => [...prev, newComment]);
       setComment("");
+      setShowCommentBox(false);
+    } catch (err) {
+      toast({
+        title: "Failed to post comment",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    setDeletingCommentId(commentId);
+    try {
+      const res = await fetch(
+        `/api/issues/${issueId}/comments?commentId=${commentId}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error("Delete failed");
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch {
+      toast({ title: "Failed to delete comment", variant: "destructive" });
+    } finally {
+      setDeletingCommentId(null);
     }
   };
 
@@ -255,7 +350,6 @@ export function ViewTaskDialog({
 
   return (
     <>
-      {/* Always in DOM so fileInputRef is never null when the button is clicked */}
       <input
         ref={fileInputRef}
         type="file"
@@ -273,23 +367,33 @@ export function ViewTaskDialog({
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className="text-xs">
-                    {displayId}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      router.push(`/tasks/${task?.id}/edit` as never)
-                    }
-                  >
-                    <Edit className="w-4 h-4 mr-1" />
-                    Edit
-                  </Button>
+                  {taskLoading ? (
+                    <Skeleton className="h-5 w-20" />
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      {displayId}
+                    </Badge>
+                  )}
+                  {!taskLoading && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        router.push(`/tasks/${issueId}/edit` as never)
+                      }
+                    >
+                      <Edit className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                  )}
                 </div>
-                <DialogTitle className="text-2xl">
-                  {task?.title ?? "Untitled"}
-                </DialogTitle>
+                {taskLoading ? (
+                  <Skeleton className="h-8 w-80" />
+                ) : (
+                  <DialogTitle className="text-2xl">
+                    {taskData?.title ?? "Untitled"}
+                  </DialogTitle>
+                )}
               </div>
               <Button
                 variant="ghost"
@@ -306,401 +410,563 @@ export function ViewTaskDialog({
           </DialogHeader>
 
           <ScrollArea className="flex-1 px-6 py-4">
-            <div className="space-y-6">
-              {/* Task Details */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Label className="w-24 text-muted-foreground flex items-center gap-2">
-                      <Flag className="w-4 h-4" />
-                      Status:
-                    </Label>
-                    <Select value={status} onValueChange={handleStatusChange}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statuses.map((s) => (
-                          <SelectItem key={s.key} value={s.key}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            {taskLoading ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-8 w-full" />
+                    ))}
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
-                      <Flag className="w-4 h-4" />
-                      Priority:
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Flag
-                        className={`w-4 h-4 ${getPriorityColor(priority)}`}
-                      />
-                      <span className="text-sm capitalize">{priority}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      Assignee:
-                    </div>
-                    {task?.assignee ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="w-6 h-6">
-                          <AvatarFallback className="text-xs">
-                            {task.assignee.initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{task.assignee.name}</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        Unassigned
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      Reporter:
-                    </div>
-                    {task?.reporter ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="w-6 h-6">
-                          <AvatarFallback className="text-xs">
-                            {task.reporter.initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{task.reporter.name}</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        Unknown
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Due Date:
-                    </div>
-                    <span className="text-sm">
-                      {formattedDueDate ?? (
-                        <span className="text-muted-foreground">Not set</span>
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Created:
-                    </div>
-                    <span className="text-sm">
-                      {formattedCreatedAt ?? (
-                        <span className="text-muted-foreground">Unknown</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {task?.epicName && (
-                <div className="flex items-center gap-3">
-                  <div className="w-24 text-muted-foreground text-sm shrink-0">
-                    Epic:
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-xs bg-primary/5 border-primary/30 text-primary"
-                  >
-                    {task.epicName}
-                  </Badge>
-                </div>
-              )}
-
-              {task?.labels && task.labels.length > 0 && (
-                <div className="flex items-center gap-3">
-                  <div className="w-24 text-muted-foreground text-sm shrink-0">
-                    Labels:
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {task.labels.map((l) => (
-                      <Badge key={l} variant="secondary" className="text-xs">
-                        {l}
-                      </Badge>
+                  <div className="space-y-3">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <Skeleton key={i} className="h-8 w-full" />
                     ))}
                   </div>
                 </div>
-              )}
-
-              {/* Tabs */}
-              <Tabs
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="w-full"
-              >
-                <TabsList className="h-10 w-full justify-start bg-transparent border-b border-border rounded-none p-0 gap-1">
-                  <TabsTrigger
-                    value="description"
-                    className="h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground gap-2"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Description
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="comments"
-                    className="h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground gap-2"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    Comments
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="attachments"
-                    className="h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground gap-2"
-                  >
-                    <Paperclip className="w-4 h-4" />
-                    Attachments
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="history"
-                    className="h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground gap-2"
-                  >
-                    <History className="w-4 h-4" />
-                    History
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="description" className="mt-4 space-y-4">
-                  {task?.parentTask && (
-                    <div className="border rounded-md p-3 bg-muted/30">
-                      <div className="text-xs text-muted-foreground mb-1">
-                        Parent Task
-                      </div>
-                      <Button
-                        variant="link"
-                        className="h-auto p-0 font-medium text-primary"
-                        onClick={() => setViewingParentTask(true)}
-                      >
-                        {task.parentTask.id} - {task.parentTask.title}
-                      </Button>
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Label className="w-24 text-muted-foreground flex items-center gap-2">
+                        <Flag className="w-4 h-4" />
+                        Status:
+                      </Label>
+                      <Select value={status} onValueChange={handleStatusChange}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statuses.map((s) => (
+                            <SelectItem key={s.key} value={s.key}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
 
-                  {task?.description ? (
-                    <div
-                      className="prose prose-sm max-w-none text-muted-foreground"
-                      dangerouslySetInnerHTML={{ __html: task.description }}
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No description provided.
-                    </p>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="comments" className="mt-4 space-y-4">
-                  <div className="pt-2">
-                    <div className="flex gap-3 items-start">
-                      <Avatar className="w-9 h-9 shrink-0">
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                          {task?.reporter?.initials ?? "??"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 space-y-2">
-                        <Textarea
-                          placeholder="Add a comment... Use @ to mention team members"
-                          value={comment}
-                          onChange={(e) => setComment(e.target.value)}
-                          rows={3}
-                          className="rounded-sm resize-none"
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
+                        <Flag className="w-4 h-4" />
+                        Priority:
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Flag
+                          className={`w-4 h-4 ${getPriorityColor(priority)}`}
                         />
-                        <div className="flex justify-end">
-                          <Button size="sm" onClick={handleAddComment}>
-                            <Send className="w-4 h-4 mr-2" />
-                            Post Comment
-                          </Button>
-                        </div>
+                        <span className="text-sm capitalize">{priority}</span>
                       </div>
                     </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No comments yet.
-                  </p>
-                </TabsContent>
 
-                <TabsContent value="attachments" className="mt-4 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground">
-                      {attachmentsLoaded
-                        ? `${attachments.length} attachment${attachments.length !== 1 ? "s" : ""}`
-                        : "Loading..."}
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      {uploading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        Assignee:
+                      </div>
+                      {taskData?.assignee ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="w-6 h-6">
+                            <AvatarFallback className="text-xs">
+                              {taskData.assignee.initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm">
+                            {taskData.assignee.name}
+                          </span>
+                        </div>
                       ) : (
-                        <Upload className="w-4 h-4 mr-2" />
+                        <span className="text-sm text-muted-foreground">
+                          Unassigned
+                        </span>
                       )}
-                      {uploading ? "Uploading…" : "Upload file"}
-                    </Button>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        Reporter:
+                      </div>
+                      {taskData?.reporter ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="w-6 h-6">
+                            <AvatarFallback className="text-xs">
+                              {taskData.reporter.initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm">
+                            {taskData.reporter.name}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          Unknown
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {!attachmentsLoaded ? (
-                    <div className="flex justify-center py-8">
-                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Due Date:
+                      </div>
+                      <span className="text-sm">
+                        {formattedDueDate ?? (
+                          <span className="text-muted-foreground">Not set</span>
+                        )}
+                      </span>
                     </div>
-                  ) : attachments.length === 0 ? (
-                    <div className="text-center py-10 text-muted-foreground space-y-1">
-                      <Paperclip className="w-8 h-8 mx-auto opacity-30" />
-                      <p className="text-sm">No attachments yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {attachments.map((att) => {
-                        const isImage = att.mime_type.startsWith("image/");
-                        const sizeLabel =
-                          att.size < 1024 * 1024
-                            ? `${(att.size / 1024).toFixed(1)} KB`
-                            : `${(att.size / (1024 * 1024)).toFixed(1)} MB`;
-                        return (
-                          <div
-                            key={att.id}
-                            className="flex items-center gap-3 rounded-md border border-border px-3 py-2.5 hover:bg-muted/30 transition-colors group"
-                          >
-                            <div className="shrink-0 text-muted-foreground">
-                              {isImage ? (
-                                <ImageIcon className="w-5 h-5" />
-                              ) : (
-                                <FileIcon className="w-5 h-5" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <a
-                                href={att.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm font-medium text-foreground hover:underline truncate block"
-                              >
-                                {att.filename}
-                              </a>
-                              <p className="text-xs text-muted-foreground">
-                                {sizeLabel} · {att.uploader_name} ·{" "}
-                                {new Date(att.created_at).toLocaleDateString(
-                                  undefined,
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  },
-                                )}
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                              onClick={() => handleDeleteAttachment(att.id)}
-                              disabled={deletingId === att.id}
-                            >
-                              {deletingId === att.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-3.5 h-3.5" />
-                              )}
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </TabsContent>
 
-                <TabsContent value="history" className="mt-4">
-                  {!activitiesLoaded ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Loading...
-                    </p>
-                  ) : activities.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No history available.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {activities.map((a) => {
-                        let description = a.type;
-                        try {
-                          const p = JSON.parse(a.payload);
-                          if (a.type === "created")
-                            description = `created this issue`;
-                          else if (a.type === "moved")
-                            description = `moved from "${p.from}" to "${p.to}"`;
-                          else if (a.type === "updated")
-                            description = `updated this issue`;
-                        } catch {}
-                        return (
-                          <div
-                            key={a.id}
-                            className="flex items-start gap-3 py-2 border-b border-border last:border-0"
-                          >
-                            <Avatar className="w-7 h-7 shrink-0">
-                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                {a.username.slice(0, 2).toUpperCase()}
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Created:
+                      </div>
+                      <span className="text-sm">
+                        {formattedCreatedAt ?? (
+                          <span className="text-muted-foreground">Unknown</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {taskData?.epic_name && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-24 text-muted-foreground text-sm shrink-0">
+                      Epic:
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-primary/5 border-primary/30 text-primary"
+                    >
+                      {taskData.epic_name}
+                    </Badge>
+                  </div>
+                )}
+
+                {taskData?.labels && taskData.labels.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-24 text-muted-foreground text-sm shrink-0">
+                      Labels:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {taskData.labels.map((l) => (
+                        <Badge key={l} variant="secondary" className="text-xs">
+                          {l}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-full"
+                >
+                  <TabsList className="h-10 w-full justify-start bg-transparent border-b border-border rounded-none p-0 gap-1">
+                    <TabsTrigger
+                      value="description"
+                      className="h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Description
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="comments"
+                      className="h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Comments
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="attachments"
+                      className="h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground gap-2"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                      Attachments
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="history"
+                      className="h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground gap-2"
+                    >
+                      <History className="w-4 h-4" />
+                      History
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="description" className="mt-4 space-y-4">
+                    {taskData?.parentTask && (
+                      <div className="border rounded-md p-3 bg-muted/30">
+                        <div className="text-xs text-muted-foreground mb-1">
+                          Parent Task
+                        </div>
+                        <Button
+                          variant="link"
+                          className="h-auto p-0 font-medium text-primary"
+                          onClick={() => setViewingParentTask(true)}
+                        >
+                          {taskData.parentTask.id} - {taskData.parentTask.title}
+                        </Button>
+                      </div>
+                    )}
+
+                    {taskData?.description ? (
+                      <div
+                        className="prose prose-sm max-w-none text-muted-foreground"
+                        dangerouslySetInnerHTML={{
+                          __html: taskData.description,
+                        }}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No description provided.
+                      </p>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="comments" className="mt-4 space-y-4">
+                    {!commentsLoaded ? (
+                      <div className="space-y-4">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <div key={i} className="flex gap-3">
+                            <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Skeleton className="h-3.5 w-20" />
+                                <Skeleton className="h-3 w-28" />
+                              </div>
+                              <Skeleton className="h-14 w-full rounded-md" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : comments.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <MessageSquare className="w-8 h-8 mx-auto opacity-30 mb-2" />
+                        <p className="text-sm">No comments yet.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {comments.map((c) => (
+                          <div key={c.id} className="flex gap-3 group">
+                            <Avatar className="w-8 h-8 shrink-0">
+                              <AvatarFallback className="text-xs bg-muted text-muted-foreground">
+                                {c.username.slice(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium">
-                                {a.username}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {" "}
-                                {description}
-                              </span>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {new Date(a.created_at).toLocaleString(
-                                  undefined,
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
+                            <div className="flex-1 bg-muted/30 rounded-md px-3 py-2.5">
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium">
+                                    {c.username}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(c.created_at).toLocaleString(
+                                      undefined,
+                                      {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      },
+                                    )}
+                                  </span>
+                                  {c.edited_at && (
+                                    <span className="text-xs text-muted-foreground italic">
+                                      (edited)
+                                    </span>
+                                  )}
+                                </div>
+                                {c.is_own && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                    onClick={() => handleDeleteComment(c.id)}
+                                    disabled={deletingCommentId === c.id}
+                                  >
+                                    {deletingCommentId === c.id ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="w-3 h-3" />
+                                    )}
+                                  </Button>
                                 )}
+                              </div>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">
+                                {c.body}
                               </p>
                             </div>
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
+                    )}
+
+                    {!showCommentBox ? (
+                      <button
+                        onClick={() => setShowCommentBox(true)}
+                        className="w-full flex items-center gap-3 text-sm text-muted-foreground hover:text-foreground rounded-lg border border-dashed border-border hover:border-muted-foreground/50 px-3 py-2.5 transition-colors text-left"
+                      >
+                        <Avatar className="w-7 h-7 shrink-0">
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            {currentUsername
+                              ? currentUsername.slice(0, 2).toUpperCase()
+                              : "??"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>Write a comment…</span>
+                      </button>
+                    ) : (
+                      <div className="flex gap-3 items-start">
+                        <Avatar className="w-9 h-9 shrink-0">
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            {currentUsername
+                              ? currentUsername.slice(0, 2).toUpperCase()
+                              : "??"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 space-y-2">
+                          <Textarea
+                            autoFocus
+                            placeholder="Add a comment… Ctrl+Enter to submit, Esc to cancel"
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            rows={3}
+                            className="rounded-sm resize-none"
+                            onKeyDown={(e) => {
+                              if (
+                                e.key === "Enter" &&
+                                (e.metaKey || e.ctrlKey)
+                              ) {
+                                handleAddComment();
+                              }
+                              if (e.key === "Escape") {
+                                setShowCommentBox(false);
+                                setComment("");
+                              }
+                            }}
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setShowCommentBox(false);
+                                setComment("");
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleAddComment}
+                              disabled={submittingComment || !comment.trim()}
+                            >
+                              {submittingComment ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4 mr-2" />
+                              )}
+                              {submittingComment ? "Posting…" : "Post Comment"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="attachments" className="mt-4 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm text-muted-foreground">
+                        {attachmentsLoaded
+                          ? `${attachments.length} attachment${attachments.length !== 1 ? "s" : ""}`
+                          : "Loading..."}
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        {uploading ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4 mr-2" />
+                        )}
+                        {uploading ? "Uploading…" : "Upload file"}
+                      </Button>
                     </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </div>
+
+                    {!attachmentsLoaded ? (
+                      <div className="space-y-2">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-3 rounded-md border border-border px-3 py-2.5"
+                          >
+                            <Skeleton className="w-5 h-5 shrink-0" />
+                            <div className="flex-1 space-y-1.5">
+                              <Skeleton className="h-3.5 w-48" />
+                              <Skeleton className="h-3 w-32" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : attachments.length === 0 ? (
+                      <div className="text-center py-10 text-muted-foreground space-y-1">
+                        <Paperclip className="w-8 h-8 mx-auto opacity-30" />
+                        <p className="text-sm">No attachments yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {attachments.map((att) => {
+                          const isImage = att.mime_type.startsWith("image/");
+                          const sizeLabel =
+                            att.size < 1024 * 1024
+                              ? `${(att.size / 1024).toFixed(1)} KB`
+                              : `${(att.size / (1024 * 1024)).toFixed(1)} MB`;
+                          return (
+                            <div
+                              key={att.id}
+                              className="flex items-center gap-3 rounded-md border border-border px-3 py-2.5 hover:bg-muted/30 transition-colors group"
+                            >
+                              <div className="shrink-0 text-muted-foreground">
+                                {isImage ? (
+                                  <ImageIcon className="w-5 h-5" />
+                                ) : (
+                                  <FileIcon className="w-5 h-5" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <a
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm font-medium text-foreground hover:underline truncate block"
+                                >
+                                  {att.filename}
+                                </a>
+                                <p className="text-xs text-muted-foreground">
+                                  {sizeLabel} · {att.uploader_name} ·{" "}
+                                  {new Date(att.created_at).toLocaleDateString(
+                                    undefined,
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    },
+                                  )}
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                onClick={() => handleDeleteAttachment(att.id)}
+                                disabled={deletingId === att.id}
+                              >
+                                {deletingId === att.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="history" className="mt-4">
+                    {!activitiesLoaded ? (
+                      <div className="space-y-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start gap-3 py-2.5 border-b border-border last:border-0"
+                          >
+                            <Skeleton className="w-7 h-7 rounded-full shrink-0" />
+                            <div className="flex-1 space-y-1.5 pt-0.5">
+                              <Skeleton className="h-3.5 w-56" />
+                              <Skeleton className="h-3 w-24" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : activities.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        No history available.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {activities.map((a) => {
+                          let description = a.type;
+                          try {
+                            const p = JSON.parse(a.payload);
+                            if (a.type === "created")
+                              description = `created this issue`;
+                            else if (a.type === "moved")
+                              description = `moved from "${p.from}" to "${p.to}"`;
+                            else if (a.type === "updated")
+                              description = `updated this issue`;
+                          } catch {}
+                          return (
+                            <div
+                              key={a.id}
+                              className="flex items-start gap-3 py-2 border-b border-border last:border-0"
+                            >
+                              <Avatar className="w-7 h-7 shrink-0">
+                                <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                  {a.username.slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-medium">
+                                  {a.username}
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  {" "}
+                                  {description}
+                                </span>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {new Date(a.created_at).toLocaleString(
+                                    undefined,
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    },
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
           </ScrollArea>
         </DialogContent>
       </Dialog>
 
-      {/* Parent Task Dialog */}
-      {viewingParentTask && task?.parentTask && (
+      {viewingParentTask && taskData?.parentTask && (
         <ViewTaskDialog
           trigger={<div />}
-          task={{
-            id: task.parentTask.id,
-            title: task.parentTask.title,
-          }}
+          issueId={taskData.parentTask.id}
           open={true}
           onOpenChange={(isOpen) => {
             if (!isOpen) setViewingParentTask(false);
@@ -708,17 +974,10 @@ export function ViewTaskDialog({
         />
       )}
 
-      {/* Subtask Dialog */}
       {viewingSubtaskId && (
         <ViewTaskDialog
           trigger={<div />}
-          task={{
-            id: viewingSubtaskId,
-            parentTask:
-              task?.id && task?.title
-                ? { id: task.id, title: task.title }
-                : undefined,
-          }}
+          issueId={viewingSubtaskId}
           open={true}
           onOpenChange={(isOpen) => {
             if (!isOpen) setViewingSubtaskId(null);

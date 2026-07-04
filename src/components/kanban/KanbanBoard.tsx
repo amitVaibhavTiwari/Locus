@@ -22,7 +22,7 @@ export interface Task {
   title: string;
   description?: string;
   status: string;
-  priority: "low" | "medium" | "high";
+  priority: "highest" | "high" | "medium" | "low" | "none";
   assignee?: {
     name: string;
     avatar?: string;
@@ -64,6 +64,8 @@ interface KanbanBoardProps {
   onMoveIssue?: (issueId: string, newStatus: string) => void;
   subGroupBy?: import("@/lib/subGroup").SubGroupBy;
   boardColumns?: Array<{ id: string; title: string }>;
+  columnHasMore?: Record<string, boolean>;
+  columnLoading?: Record<string, boolean>;
 }
 
 export function KanbanBoard({
@@ -72,9 +74,10 @@ export function KanbanBoard({
   onMoveIssue,
   subGroupBy = "none",
   boardColumns,
+  columnHasMore = {},
+  columnLoading = {},
 }: KanbanBoardProps) {
   const columns = boardColumns ?? DEFAULT_COLUMNS;
-  const boardStatuses = columns.map((c) => ({ key: c.id, name: c.title }));
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const tasks = externalTasks || [];
 
@@ -187,7 +190,8 @@ export function KanbanBoard({
                 key={column.id}
                 column={column}
                 tasks={getTasksByStatus(column.id)}
-                boardStatuses={boardStatuses}
+                hasMore={columnHasMore[column.id]}
+                loading={columnLoading[column.id]}
               />
             ))}
           </div>
@@ -235,7 +239,6 @@ export function KanbanBoard({
                           tasks={g.tasks.filter((t) => t.status === column.id)}
                           hideHeaderCount={false}
                           droppableIdSuffix={g.key}
-                          boardStatuses={boardStatuses}
                         />
                       ))}
                     </div>

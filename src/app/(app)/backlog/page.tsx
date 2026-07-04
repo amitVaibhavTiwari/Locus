@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import {
   getSessionUser,
   getActiveOrg,
@@ -38,7 +38,11 @@ export default async function BacklogPage({
       projects={projects.map((p) => ({ id: p.id, name: p.name }))}
       selectedProjectId={resolvedProjectId}
       issues={issues}
-      sprints={plannedOrActiveSprints.map((s) => ({ id: s.id, name: s.name, status: s.status }))}
+      sprints={plannedOrActiveSprints.map((s) => ({
+        id: s.id,
+        name: s.name,
+        status: s.status,
+      }))}
     />
   );
 }

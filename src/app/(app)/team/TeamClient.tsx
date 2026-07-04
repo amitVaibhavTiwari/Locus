@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,33 +36,49 @@ import {
   CalendarDays,
   MoreHorizontal,
   Archive,
-  ChevronLeft,
-  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { inviteTeammates, removeMember } from "@/actions/members";
+import { formatDateTime } from "@/lib/date";
 
-export interface TeamMember {
-  id: string;
+interface Member {
+  memberId: string;
   userId: string;
-  name: string;
+  username: string;
   email: string;
-  role: "Super Admin" | "Admin" | "Member";
-  dbRole: "owner" | "admin" | "member";
-  initials: string;
-  joinDate: string;
+  role: "owner" | "admin" | "member";
+  joined_at: string;
+  avatar_url: string | null;
 }
 
 interface TeamClientProps {
-  initialMembers: TeamMember[];
+  initialMembers: Member[];
+  initialHasMore: boolean;
+  initialTotal: number;
   currentUserId: string;
   currentUserRole: "owner" | "admin" | "member";
   allowAdminInvite: boolean;
 }
 
-const MEMBERS_PER_PAGE = 15;
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function mapRole(role: "owner" | "admin" | "member"): string {
+  if (role === "owner") return "Super Admin";
+  if (role === "admin") return "Admin";
+  return "Member";
+}
 
 export function TeamClient({
   initialMembers,
+  initialHasMore,
+  initialTotal,
   currentUserId,
   currentUserRole,
   allowAdminInvite,
@@ -71,41 +87,101 @@ export function TeamClient({
   const { toast } = useToast();
   const [, startTransition] = useTransition();
 
-  const [members, setMembers] = useState<TeamMember[]>(initialMembers);
+  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [total, setTotal] = useState(initialTotal);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberRole, setNewMemberRole] = useState("");
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-  const [memberToArchive, setMemberToArchive] = useState<TeamMember | null>(
-    null,
-  );
+  const [memberToArchive, setMemberToArchive] = useState<Member | null>(null);
   const [unassignTasks, setUnassignTasks] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+
+  // Refs for IntersectionObserver
+  const offsetRef = useRef(initialMembers.length);
+  const searchRef = useRef("");
+  const roleRef = useRef("all");
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(initialHasMore);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  hasMoreRef.current = hasMore;
+  loadingRef.current = loading;
 
   const canInvite =
     currentUserRole === "owner" ||
     (currentUserRole === "admin" && allowAdminInvite);
   const canRemove = currentUserRole === "owner";
 
-  const filteredMembers = members.filter((member) => {
-    const matchesSearch =
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === "all" || member.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
-
-  const totalPages = Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE);
-  const paginatedMembers = filteredMembers.slice(
-    (currentPage - 1) * MEMBERS_PER_PAGE,
-    currentPage * MEMBERS_PER_PAGE,
-  );
-
-  React.useEffect(() => {
-    setCurrentPage(1);
+  // Debounce search/filter — reset and refetch
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      searchRef.current = searchQuery;
+      roleRef.current = roleFilter;
+      offsetRef.current = 0;
+      setLoading(true);
+      loadingRef.current = true;
+      try {
+        const params = new URLSearchParams({ offset: "0" });
+        if (searchQuery) params.set("search", searchQuery);
+        if (roleFilter !== "all") params.set("role", roleFilter);
+        const res = await fetch(`/api/org/members?${params}`);
+        if (!res.ok) return;
+        const data: { members: Member[]; hasMore: boolean; total: number } = await res.json();
+        setMembers(data.members);
+        setHasMore(data.hasMore);
+        setTotal(data.total);
+        hasMoreRef.current = data.hasMore;
+        offsetRef.current = data.members.length;
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    }, 300);
+    return () => clearTimeout(t);
   }, [searchQuery, roleFilter]);
+
+  // Infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const loadMore = async () => {
+      if (loadingRef.current || !hasMoreRef.current) return;
+      loadingRef.current = true;
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          offset: String(offsetRef.current),
+        });
+        if (searchRef.current) params.set("search", searchRef.current);
+        if (roleRef.current !== "all") params.set("role", roleRef.current);
+        const res = await fetch(`/api/org/members?${params}`);
+        if (!res.ok) return;
+        const data: { members: Member[]; hasMore: boolean } = await res.json();
+        setMembers((prev) => [...prev, ...data.members]);
+        setHasMore(data.hasMore);
+        hasMoreRef.current = data.hasMore;
+        offsetRef.current += data.members.length;
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { threshold: 0.1, rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   const handleInviteMember = () => {
     if (!newMemberEmail.trim() || !newMemberRole) {
@@ -121,16 +197,9 @@ export function TeamClient({
         { email: newMemberEmail, role: newMemberRole.toLowerCase() },
       ]);
       if (result.error) {
-        toast({
-          title: "Error",
-          description: result.error,
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: result.error, variant: "destructive" });
       } else {
-        toast({
-          title: "Invitation sent",
-          description: `Invitation sent to ${newMemberEmail}`,
-        });
+        toast({ title: "Invitation sent", description: `Invitation sent to ${newMemberEmail}` });
         setNewMemberEmail("");
         setNewMemberRole("");
         setInviteDialogOpen(false);
@@ -141,19 +210,15 @@ export function TeamClient({
   const handleArchiveMember = () => {
     if (!memberToArchive) return;
     startTransition(async () => {
-      const result = await removeMember(memberToArchive.id);
+      const result = await removeMember(memberToArchive.memberId);
       if (result?.error) {
-        toast({
-          title: "Error",
-          description: result.error,
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: result.error, variant: "destructive" });
       } else {
         toast({
           title: "Member removed",
-          description: `${memberToArchive.name} has been removed from the workspace`,
+          description: `${memberToArchive.username} has been removed from the workspace`,
         });
-        setMembers((prev) => prev.filter((m) => m.id !== memberToArchive.id));
+        setMembers((prev) => prev.filter((m) => m.memberId !== memberToArchive.memberId));
       }
       setMemberToArchive(null);
       setUnassignTasks(false);
@@ -165,7 +230,12 @@ export function TeamClient({
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Team</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-foreground">Team</h1>
+            <span className="flex items-center justify-center min-w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold px-2">
+              {total}
+            </span>
+          </div>
           <p className="text-muted-foreground mt-1">
             Manage your team members and their roles
           </p>
@@ -199,10 +269,7 @@ export function TeamClient({
                 </div>
                 <div className="space-y-2">
                   <Label>Role *</Label>
-                  <Select
-                    value={newMemberRole}
-                    onValueChange={setNewMemberRole}
-                  >
+                  <Select value={newMemberRole} onValueChange={setNewMemberRole}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
@@ -213,10 +280,7 @@ export function TeamClient({
                   </Select>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setInviteDialogOpen(false)}
-                  >
+                  <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
                     Cancel
                   </Button>
                   <Button onClick={handleInviteMember}>Send Invitation</Button>
@@ -229,7 +293,7 @@ export function TeamClient({
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search team members..."
             value={searchQuery}
@@ -238,40 +302,40 @@ export function TeamClient({
           />
         </div>
         <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-36">
             <SelectValue placeholder="Role" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="Super Admin">Super Admin</SelectItem>
-            <SelectItem value="Admin">Admin</SelectItem>
-            <SelectItem value="Member">Member</SelectItem>
+            <SelectItem value="owner">Super Admin</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="member">Member</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div className="space-y-3">
-        {paginatedMembers.map((member) => {
+        {members.map((member) => {
           const isSelf = member.userId === currentUserId;
-          const isSuperAdmin = member.dbRole === "owner";
+          const isSuperAdmin = member.role === "owner";
           const showMenu = canRemove && !isSelf && !isSuperAdmin;
 
           return (
             <div
-              key={member.id}
+              key={member.memberId}
               onClick={() => router.push(`/team/${member.userId}`)}
               className="flex items-center justify-between p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
             >
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <Avatar className="w-8 h-8 shrink-0">
                   <AvatarFallback className="text-xs">
-                    {member.initials}
+                    {getInitials(member.username)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {member.name}
+                      {member.username}
                     </h3>
                     {isSelf && (
                       <span className="text-xs text-muted-foreground border border-border rounded px-1.5 py-0.5">
@@ -289,10 +353,10 @@ export function TeamClient({
               <div className="flex items-center gap-6">
                 <div className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground">
                   <CalendarDays className="w-4 h-4" />
-                  <span>{new Date(member.joinDate).toLocaleDateString()}</span>
+                  <span>{formatDateTime(member.joined_at, { month: "short", day: "numeric", year: "numeric" })}</span>
                 </div>
                 <span className="text-sm text-muted-foreground w-24 text-right">
-                  {member.role}
+                  {mapRole(member.role)}
                 </span>
 
                 {showMenu ? (
@@ -307,10 +371,7 @@ export function TeamClient({
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
                         onClick={(e) => {
@@ -332,44 +393,21 @@ export function TeamClient({
             </div>
           );
         })}
+
+        {!loading && members.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">No team members found</p>
+          </div>
+        )}
       </div>
 
-      {filteredMembers.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-sm text-muted-foreground">No team members found</p>
+      {loading && (
+        <div className="flex justify-center py-4">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-sm text-muted-foreground">
-            Showing {(currentPage - 1) * MEMBERS_PER_PAGE + 1}–
-            {Math.min(currentPage * MEMBERS_PER_PAGE, filteredMembers.length)}{" "}
-            of {filteredMembers.length} members
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground min-w-12 text-center">
-              {currentPage} / {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <div ref={sentinelRef} className="h-4" />
 
       <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
         <DialogContent>
@@ -379,7 +417,7 @@ export function TeamClient({
               <span className="block">
                 Are you sure you want to remove{" "}
                 <span className="font-semibold text-foreground">
-                  {memberToArchive?.name}
+                  {memberToArchive?.username}
                 </span>{" "}
                 from the workspace?
               </span>
@@ -389,9 +427,7 @@ export function TeamClient({
             <Checkbox
               id="unassign-tasks"
               checked={unassignTasks}
-              onCheckedChange={(checked) =>
-                setUnassignTasks(checked as boolean)
-              }
+              onCheckedChange={(checked) => setUnassignTasks(checked as boolean)}
             />
             <label
               htmlFor="unassign-tasks"
@@ -401,10 +437,7 @@ export function TeamClient({
             </label>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setArchiveDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleArchiveMember}>

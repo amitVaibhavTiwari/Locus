@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition, useEffect } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
@@ -52,16 +53,16 @@ import {
   MoreHorizontal,
   UserMinus,
   Shield,
-  ChevronLeft,
-  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import {
   addProjectMember,
   removeProjectMember,
   changeProjectMemberRole,
 } from "@/actions/project-team";
+import { formatDateTime } from "@/lib/date";
 
-export interface ProjectMember {
+interface ProjectMember {
   memberId: string;
   userId: string;
   username: string;
@@ -71,7 +72,7 @@ export interface ProjectMember {
   joined_at: string;
 }
 
-export interface AvailableMember {
+interface AvailableMember {
   userId: string;
   username: string;
   email: string;
@@ -81,7 +82,9 @@ export interface AvailableMember {
 interface ProjectTeamClientProps {
   projectId: string;
   projectName: string;
-  projectMembers: ProjectMember[];
+  initialMembers: ProjectMember[];
+  initialHasMore: boolean;
+  initialTotal: number;
   availableMembers: AvailableMember[];
   currentUserId: string;
 }
@@ -95,12 +98,12 @@ function getInitials(username: string) {
     .slice(0, 2);
 }
 
-const MEMBERS_PER_PAGE = 10;
-
 export function ProjectTeamClient({
   projectId,
   projectName,
-  projectMembers: initialProjectMembers,
+  initialMembers,
+  initialHasMore,
+  initialTotal,
   availableMembers: initialAvailableMembers,
   currentUserId,
 }: ProjectTeamClientProps) {
@@ -108,71 +111,122 @@ export function ProjectTeamClient({
   const { toast } = useToast();
   const [, startTransition] = useTransition();
 
-  const [members, setMembers] = useState(initialProjectMembers);
-  const [available, setAvailable] = useState(initialAvailableMembers);
-
-  useEffect(() => {
-    setMembers(initialProjectMembers);
-    setAvailable(initialAvailableMembers);
-  }, [initialProjectMembers, initialAvailableMembers]);
-
+  const [members, setMembers] = useState<ProjectMember[]>(initialMembers);
+  const [available, setAvailable] = useState<AvailableMember[]>(initialAvailableMembers);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [total, setTotal] = useState(initialTotal);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
 
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [addRole, setAddRole] = useState<"manager" | "member">("member");
 
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const [memberToRemove, setMemberToRemove] = useState<ProjectMember | null>(
-    null,
-  );
+  const [memberToRemove, setMemberToRemove] = useState<ProjectMember | null>(null);
   const [unassignTasksOnRemove, setUnassignTasksOnRemove] = useState(false);
 
   const [changeRoleDialogOpen, setChangeRoleDialogOpen] = useState(false);
-  const [memberToChangeRole, setMemberToChangeRole] =
-    useState<ProjectMember | null>(null);
+  const [memberToChangeRole, setMemberToChangeRole] = useState<ProjectMember | null>(null);
   const [newRole, setNewRole] = useState<"manager" | "member">("member");
 
-  const filteredMembers = members.filter((m) => {
-    const matchesSearch =
-      m.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === "all" || m.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
+  // Refs for IntersectionObserver
+  const offsetRef = useRef(initialMembers.length);
+  const searchRef = useRef("");
+  const roleRef = useRef("all");
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(initialHasMore);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const totalPages = Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE);
-  const paginatedMembers = filteredMembers.slice(
-    (currentPage - 1) * MEMBERS_PER_PAGE,
-    currentPage * MEMBERS_PER_PAGE,
-  );
+  hasMoreRef.current = hasMore;
+  loadingRef.current = loading;
 
+  // Debounce search/filter — reset and refetch
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, roleFilter]);
+    const t = setTimeout(async () => {
+      searchRef.current = searchQuery;
+      roleRef.current = roleFilter;
+      offsetRef.current = 0;
+      setLoading(true);
+      loadingRef.current = true;
+      try {
+        const params = new URLSearchParams({ offset: "0" });
+        if (searchQuery) params.set("search", searchQuery);
+        if (roleFilter !== "all") params.set("role", roleFilter);
+        const res = await fetch(
+          `/api/projects/${projectId}/members?${params}`,
+        );
+        if (!res.ok) return;
+        const data: { members: ProjectMember[]; hasMore: boolean; total: number } =
+          await res.json();
+        setMembers(data.members);
+        setHasMore(data.hasMore);
+        setTotal(data.total);
+        hasMoreRef.current = data.hasMore;
+        offsetRef.current = data.members.length;
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery, roleFilter, projectId]);
+
+  // Infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const loadMore = async () => {
+      if (loadingRef.current || !hasMoreRef.current) return;
+      loadingRef.current = true;
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          offset: String(offsetRef.current),
+        });
+        if (searchRef.current) params.set("search", searchRef.current);
+        if (roleRef.current !== "all") params.set("role", roleRef.current);
+        const res = await fetch(
+          `/api/projects/${projectId}/members?${params}`,
+        );
+        if (!res.ok) return;
+        const data: { members: ProjectMember[]; hasMore: boolean } =
+          await res.json();
+        setMembers((prev) => [...prev, ...data.members]);
+        setHasMore(data.hasMore);
+        hasMoreRef.current = data.hasMore;
+        offsetRef.current += data.members.length;
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { threshold: 0.1, rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [projectId]);
 
   const handleAddMember = () => {
     if (!selectedUserId) {
-      toast({
-        title: "Error",
-        description: "Please select a team member",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Please select a team member", variant: "destructive" });
       return;
     }
     const member = available.find((m) => m.userId === selectedUserId);
     if (!member) return;
 
     startTransition(async () => {
-      const result = await addProjectMember(projectId, selectedUserId);
+      const result = await addProjectMember(projectId, selectedUserId, addRole);
       if (result?.error) {
-        toast({
-          title: "Error",
-          description: result.error,
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: result.error, variant: "destructive" });
         return;
       }
       setMembers((prev) => [
@@ -183,16 +237,14 @@ export function ProjectTeamClient({
           username: member.username,
           email: member.email,
           avatar_url: member.avatar_url,
-          role: "member",
+          role: addRole,
           joined_at: new Date().toISOString(),
         },
       ]);
       setAvailable((prev) => prev.filter((m) => m.userId !== selectedUserId));
-      toast({
-        title: "Member added",
-        description: `${member.username} has been added to the project`,
-      });
+      toast({ title: "Member added", description: `${member.username} has been added to the project` });
       setSelectedUserId("");
+      setAddRole("member");
       setAddMemberOpen(false);
       router.refresh();
     });
@@ -208,17 +260,11 @@ export function ProjectTeamClient({
         unassignTasksOnRemove,
       );
       if (result?.error) {
-        toast({
-          title: "Error",
-          description: result.error,
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: result.error, variant: "destructive" });
         setRemoveDialogOpen(false);
         return;
       }
-      setMembers((prev) =>
-        prev.filter((m) => m.userId !== memberToRemove.userId),
-      );
+      setMembers((prev) => prev.filter((m) => m.userId !== memberToRemove.userId));
       setAvailable((prev) => [
         ...prev,
         {
@@ -249,11 +295,7 @@ export function ProjectTeamClient({
         newRole,
       );
       if (result?.error) {
-        toast({
-          title: "Error",
-          description: result.error,
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: result.error, variant: "destructive" });
         setChangeRoleDialogOpen(false);
         return;
       }
@@ -262,10 +304,7 @@ export function ProjectTeamClient({
           m.userId === memberToChangeRole.userId ? { ...m, role: newRole } : m,
         ),
       );
-      toast({
-        title: "Role updated",
-        description: `${name}'s role has been changed to ${newRole}`,
-      });
+      toast({ title: "Role updated", description: `${name}'s role has been changed to ${newRole}` });
       setMemberToChangeRole(null);
       setChangeRoleDialogOpen(false);
       router.refresh();
@@ -285,9 +324,14 @@ export function ProjectTeamClient({
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          <h1 className="text-3xl font-bold text-foreground">
-            {projectName} - Team
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-foreground">
+              {projectName} - Team
+            </h1>
+            <span className="flex items-center justify-center min-w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold px-2">
+              {total}
+            </span>
+          </div>
           <p className="text-muted-foreground mt-1">
             Manage team members for this project
           </p>
@@ -365,11 +409,25 @@ export function ProjectTeamClient({
                   </Command>
                 </PopoverContent>
               </Popover>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={addRole} onValueChange={(v) => setAddRole(v as "manager" | "member")}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="member">Member</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {addRole === "manager"
+                    ? "Managers can add/remove members and change roles"
+                    : "Members can view and contribute to the project"}
+                </p>
+              </div>
               <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setAddMemberOpen(false)}
-                >
+                <Button variant="outline" onClick={() => setAddMemberOpen(false)}>
                   Cancel
                 </Button>
                 <Button onClick={handleAddMember}>Add Member</Button>
@@ -404,7 +462,7 @@ export function ProjectTeamClient({
 
       {/* Member List */}
       <div className="space-y-3">
-        {paginatedMembers.map((member) => (
+        {members.map((member) => (
           <div
             key={member.userId}
             onClick={() => router.push(`/team/${member.userId}`)}
@@ -436,7 +494,13 @@ export function ProjectTeamClient({
             <div className="flex items-center gap-6">
               <div className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground">
                 <CalendarDays className="w-4 h-4" />
-                <span>{new Date(member.joined_at).toLocaleDateString()}</span>
+                <span>
+                  {formatDateTime(member.joined_at, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
               </div>
               <span className="text-sm text-muted-foreground w-20 text-right capitalize">
                 {member.role}
@@ -460,9 +524,7 @@ export function ProjectTeamClient({
                     onClick={(e) => {
                       e.stopPropagation();
                       setMemberToChangeRole(member);
-                      setNewRole(
-                        member.role === "manager" ? "manager" : "member",
-                      );
+                      setNewRole(member.role === "manager" ? "manager" : "member");
                       setChangeRoleDialogOpen(true);
                     }}
                   >
@@ -487,44 +549,21 @@ export function ProjectTeamClient({
             </div>
           </div>
         ))}
+
+        {!loading && members.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">No team members found</p>
+          </div>
+        )}
       </div>
 
-      {filteredMembers.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-sm text-muted-foreground">No team members found</p>
+      {loading && (
+        <div className="flex justify-center py-4">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-sm text-muted-foreground">
-            Showing {(currentPage - 1) * MEMBERS_PER_PAGE + 1}–
-            {Math.min(currentPage * MEMBERS_PER_PAGE, filteredMembers.length)}{" "}
-            of {filteredMembers.length} members
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground min-w-[3rem] text-center">
-              {currentPage} / {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <div ref={sentinelRef} className="h-4" />
 
       {/* Remove Member Dialog */}
       <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
@@ -561,10 +600,7 @@ export function ProjectTeamClient({
             </label>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setRemoveDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setRemoveDialogOpen(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleRemoveMember}>
@@ -575,10 +611,7 @@ export function ProjectTeamClient({
       </Dialog>
 
       {/* Change Role Dialog */}
-      <Dialog
-        open={changeRoleDialogOpen}
-        onOpenChange={setChangeRoleDialogOpen}
-      >
+      <Dialog open={changeRoleDialogOpen} onOpenChange={setChangeRoleDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Change Role</DialogTitle>

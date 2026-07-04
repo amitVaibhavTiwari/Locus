@@ -224,6 +224,7 @@ export const getSprintIssues = cache(async (sprintId: string) => {
       "priority",
       "type",
       "sprint_id",
+      "epic_id",
       "assignee_id",
       "reporter_id",
       "due_date",
@@ -252,6 +253,36 @@ export const getSprintIssues = cache(async (sprintId: string) => {
 
   const userMap = new Map(users.map((u) => [u.id, u]));
 
+  const issueIds = issues.map((i) => i.id);
+  const labelRows =
+    issueIds.length > 0
+      ? await db
+          .selectFrom("issue_labels")
+          .innerJoin("labels", "labels.id", "issue_labels.label_id")
+          .where("issue_labels.issue_id", "in", issueIds)
+          .select(["issue_labels.issue_id", "labels.name"])
+          .execute()
+      : [];
+  const labelMap = new Map<string, string[]>();
+  labelRows.forEach((r) => {
+    const arr = labelMap.get(r.issue_id) ?? [];
+    arr.push(r.name);
+    labelMap.set(r.issue_id, arr);
+  });
+
+  const epicIds = [
+    ...new Set(issues.map((i) => i.epic_id).filter(Boolean)),
+  ] as string[];
+  const epicRows =
+    epicIds.length > 0
+      ? await db
+          .selectFrom("epics")
+          .where("id", "in", epicIds)
+          .select(["id", "name"])
+          .execute()
+      : [];
+  const epicMap = new Map(epicRows.map((e) => [e.id, e.name]));
+
   return issues.map((issue) => ({
     ...issue,
     assignee: issue.assignee_id
@@ -260,6 +291,8 @@ export const getSprintIssues = cache(async (sprintId: string) => {
     reporter: issue.reporter_id
       ? (userMap.get(issue.reporter_id) ?? null)
       : null,
+    labels: labelMap.get(issue.id) ?? [],
+    epic_name: issue.epic_id ? (epicMap.get(issue.epic_id) ?? null) : null,
   }));
 });
 
@@ -610,6 +643,165 @@ export const getProjectMembers = cache(async (projectId: string) => {
     role: m.role,
     joined_at: m.joined_at,
     ...userMap.get(m.user_id)!,
+  }));
+});
+
+export const getOrgSprintSummaries = cache(async (orgId: string) => {
+  const sprints = await db
+    .selectFrom("sprints")
+    .where("organization_id", "=", orgId)
+    .selectAll()
+    .orderBy("created_at", "desc")
+    .execute();
+
+  if (sprints.length === 0) return { activeSprint: null, completedSprints: [] };
+
+  const sprintIds = sprints.map((s) => s.id);
+  const issueRows = await db
+    .selectFrom("issues")
+    .where("sprint_id", "in", sprintIds)
+    .select(["sprint_id", "completed_at"])
+    .execute();
+
+  const totalMap = new Map<string, number>();
+  const doneMap = new Map<string, number>();
+  issueRows.forEach((row) => {
+    if (!row.sprint_id) return;
+    totalMap.set(row.sprint_id, (totalMap.get(row.sprint_id) ?? 0) + 1);
+    if (row.completed_at !== null)
+      doneMap.set(row.sprint_id, (doneMap.get(row.sprint_id) ?? 0) + 1);
+  });
+
+  const enriched = sprints.map((s) => ({
+    ...s,
+    totalIssues: totalMap.get(s.id) ?? 0,
+    completedIssues: doneMap.get(s.id) ?? 0,
+  }));
+
+  const activeSprint = enriched.find((s) => s.status === "active") ?? null;
+  const completedSprints = enriched.filter((s) => s.status === "completed");
+
+  return { activeSprint, completedSprints };
+});
+
+export const getMyAssignedIssues = cache(
+  async (orgId: string, userId: string) => {
+    const issues = await db
+      .selectFrom("issues")
+      .innerJoin("projects", "projects.id", "issues.project_id")
+      .where("issues.organization_id", "=", orgId)
+      .where("issues.assignee_id", "=", userId)
+      .where("issues.parent_issue_id", "is", null)
+      .select([
+        "issues.id",
+        "issues.issue_number",
+        "issues.title",
+        "issues.description",
+        "issues.status",
+        "issues.priority",
+        "issues.type",
+        "issues.reporter_id",
+        "issues.due_date",
+        "issues.created_at",
+        "projects.name as project_name",
+      ])
+      .orderBy("issues.due_date", "asc")
+      .execute();
+
+    if (issues.length === 0) return [];
+
+    const reporterIds = [
+      ...new Set(issues.map((i) => i.reporter_id).filter(Boolean)),
+    ] as string[];
+    const reporters =
+      reporterIds.length > 0
+        ? await db
+            .selectFrom("users")
+            .where("id", "in", reporterIds)
+            .select(["id", "username"])
+            .execute()
+        : [];
+    const reporterMap = new Map(reporters.map((u) => [u.id, u]));
+
+    const issueIds = issues.map((i) => i.id);
+    const labelRows =
+      issueIds.length > 0
+        ? await db
+            .selectFrom("issue_labels")
+            .innerJoin("labels", "labels.id", "issue_labels.label_id")
+            .where("issue_labels.issue_id", "in", issueIds)
+            .select(["issue_labels.issue_id", "labels.name"])
+            .execute()
+        : [];
+
+    const labelMap = new Map<string, string[]>();
+    labelRows.forEach((r) => {
+      const arr = labelMap.get(r.issue_id) ?? [];
+      arr.push(r.name);
+      labelMap.set(r.issue_id, arr);
+    });
+
+    return issues.map((issue) => ({
+      id: issue.id,
+      issue_number: issue.issue_number,
+      title: issue.title,
+      description: issue.description ?? undefined,
+      status: issue.status,
+      priority: issue.priority as
+        | "highest"
+        | "high"
+        | "medium"
+        | "low"
+        | "none",
+      project: issue.project_name,
+      labels: labelMap.get(issue.id) ?? [],
+      dueDate: issue.due_date ?? undefined,
+      issueNumber: issue.issue_number,
+      createdAt: issue.created_at,
+      reporter: issue.reporter_id
+        ? (() => {
+            const r = reporterMap.get(issue.reporter_id!);
+            return r
+              ? {
+                  name: r.username,
+                  initials: r.username.slice(0, 2).toUpperCase(),
+                }
+              : undefined;
+          })()
+        : undefined,
+    }));
+  },
+);
+
+export const getUserWorkspaces = cache(async () => {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  const rows = await db
+    .selectFrom("organization_members")
+    .innerJoin(
+      "organizations",
+      "organizations.id",
+      "organization_members.organization_id",
+    )
+    .leftJoin(
+      "workspace_preferences",
+      "workspace_preferences.organization_id",
+      "organizations.id",
+    )
+    .where("organization_members.user_id", "=", session.user.id)
+    .select([
+      "organizations.id",
+      "organizations.name",
+      "workspace_preferences.display_name",
+      "workspace_preferences.brand_color",
+    ])
+    .execute();
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.display_name ?? r.name,
+    brandColor: r.brand_color ?? null,
   }));
 });
 

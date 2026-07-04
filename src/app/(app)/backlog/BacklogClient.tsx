@@ -64,7 +64,12 @@ interface BacklogClientProps {
 }
 
 function getInitials(name: string) {
-  return name.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -75,7 +80,12 @@ const PRIORITY_DOT: Record<string, string> = {
   none: "bg-muted-foreground",
 };
 
-export function BacklogClient({ projects, selectedProjectId, issues, sprints }: BacklogClientProps) {
+export function BacklogClient({
+  projects,
+  selectedProjectId,
+  issues,
+  sprints,
+}: BacklogClientProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -85,22 +95,36 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [reporterFilter, setReporterFilter] = useState("all");
 
-  const uniqueAssignees = [...new Set(issues.map((i) => i.assignee?.username).filter(Boolean))] as string[];
-  const uniqueReporters = [...new Set(issues.map((i) => i.reporter?.username).filter(Boolean))] as string[];
+  const uniqueAssignees = [
+    ...new Set(issues.map((i) => i.assignee?.username).filter(Boolean)),
+  ] as string[];
+  const uniqueReporters = [
+    ...new Set(issues.map((i) => i.reporter?.username).filter(Boolean)),
+  ] as string[];
 
   const filtered = issues.filter((i) => {
     const ms = i.title.toLowerCase().includes(search.toLowerCase());
     const mp = priorityFilter === "all" || i.priority === priorityFilter;
-    const ma = assigneeFilter === "all" || i.assignee?.username === assigneeFilter;
-    const mr = reporterFilter === "all" || i.reporter?.username === reporterFilter;
+    const ma =
+      assigneeFilter === "all" || i.assignee?.username === assigneeFilter;
+    const mr =
+      reporterFilter === "all" || i.reporter?.username === reporterFilter;
     return ms && mp && ma && mr;
   });
 
-  const handleMoveToSprint = (issueId: string, sprintId: string, sprintName: string) => {
+  const handleMoveToSprint = (
+    issueId: string,
+    sprintId: string,
+    sprintName: string,
+  ) => {
     startTransition(async () => {
       const result = await moveIssueToSprint(issueId, sprintId);
       if (result?.error) {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
       toast({ title: `Moved to ${sprintName}` });
@@ -117,16 +141,23 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Backlog</h1>
-          <p className="text-muted-foreground">Issues not assigned to any sprint</p>
+          <p className="text-muted-foreground">
+            Issues not assigned to any sprint
+          </p>
         </div>
         {projects.length > 1 && (
-          <Select value={selectedProjectId ?? ""} onValueChange={handleProjectChange}>
+          <Select
+            value={selectedProjectId ?? ""}
+            onValueChange={handleProjectChange}
+          >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
             <SelectContent>
               {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -142,10 +173,17 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
           <div className="flex gap-4 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input placeholder="Search backlog..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+              <Input
+                placeholder="Search backlog..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
             </div>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="Priority" /></SelectTrigger>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Priorities</SelectItem>
                 <SelectItem value="highest">Highest</SelectItem>
@@ -156,18 +194,30 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
               </SelectContent>
             </Select>
             <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="Assignee" /></SelectTrigger>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Assignee" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Assignees</SelectItem>
                 <SelectItem value="none">Unassigned</SelectItem>
-                {uniqueAssignees.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                {uniqueAssignees.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={reporterFilter} onValueChange={setReporterFilter}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="Reporter" /></SelectTrigger>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Reporter" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Reporters</SelectItem>
-                {uniqueReporters.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                {uniqueReporters.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -175,7 +225,9 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <p className="text-lg font-medium">Backlog is empty</p>
-              <p className="text-sm mt-1">All issues are assigned to sprints, or no issues exist yet.</p>
+              <p className="text-sm mt-1">
+                All issues are assigned to sprints, or no issues exist yet.
+              </p>
             </div>
           ) : (
             <div className="rounded-md border border-border bg-card overflow-hidden">
@@ -193,19 +245,17 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
                       {filtered.map((issue) => (
                         <ViewTaskDialog
                           key={issue.id}
-                          task={{
-                            id: issue.id,
-                            title: issue.title,
-                            status: issue.status,
-                            priority: issue.priority as "low" | "medium" | "high",
-                            issueNumber: issue.issue_number,
-                          }}
+                          issueId={issue.id}
                           trigger={
                             <TableRow className="border-b border-border/60 last:border-0 hover:bg-muted/30 h-14 cursor-pointer transition-colors">
                               <TableCell className="h-14 py-0 px-5">
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="text-sm font-medium text-foreground line-clamp-1">{issue.title}</span>
-                                  <span className="text-[11px] text-muted-foreground font-mono">TASK-{issue.issue_number}</span>
+                                  <span className="text-sm font-medium text-foreground line-clamp-1">
+                                    {issue.title}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground font-mono">
+                                    TASK-{issue.issue_number}
+                                  </span>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -219,27 +269,51 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
                   <Table>
                     <TableHeader>
                       <TableRow className="border-b border-border hover:bg-transparent">
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[110px] h-11 px-5">Priority</TableHead>
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[90px] h-11 px-5">Type</TableHead>
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[160px] h-11 px-5">Assignee</TableHead>
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[160px] h-11 px-5">Reporter</TableHead>
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[120px] h-11 px-5">Created</TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[110px] h-11 px-5">
+                          Priority
+                        </TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[90px] h-11 px-5">
+                          Type
+                        </TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[160px] h-11 px-5">
+                          Assignee
+                        </TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[160px] h-11 px-5">
+                          Reporter
+                        </TableHead>
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[120px] h-11 px-5">
+                          Created
+                        </TableHead>
                         {sprints.length > 0 && (
-                          <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[140px] h-11 px-5">Sprint</TableHead>
+                          <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 min-w-[140px] h-11 px-5">
+                            Sprint
+                          </TableHead>
                         )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filtered.map((issue) => (
-                        <TableRow key={issue.id} className="border-b border-border/60 last:border-0 hover:bg-muted/30 h-14 transition-colors">
+                        <TableRow
+                          key={issue.id}
+                          className="border-b border-border/60 last:border-0 hover:bg-muted/30 h-14 transition-colors"
+                        >
                           <TableCell className="h-14 py-0 px-5">
                             <div className="flex items-center gap-2">
-                              <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[issue.priority] ?? "bg-muted-foreground"}`} />
-                              <span className="text-sm capitalize text-foreground">{issue.priority}</span>
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[issue.priority] ?? "bg-muted-foreground"}`}
+                              />
+                              <span className="text-sm capitalize text-foreground">
+                                {issue.priority}
+                              </span>
                             </div>
                           </TableCell>
                           <TableCell className="h-14 py-0 px-5">
-                            <Badge variant="outline" className="text-xs capitalize">{issue.type}</Badge>
+                            <Badge
+                              variant="outline"
+                              className="text-xs capitalize"
+                            >
+                              {issue.type}
+                            </Badge>
                           </TableCell>
                           <TableCell className="h-14 py-0 px-5">
                             {issue.assignee ? (
@@ -249,10 +323,14 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
                                     {getInitials(issue.assignee.username)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="text-sm text-foreground">{issue.assignee.username}</span>
+                                <span className="text-sm text-foreground">
+                                  {issue.assignee.username}
+                                </span>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground text-sm italic">Unassigned</span>
+                              <span className="text-muted-foreground text-sm italic">
+                                Unassigned
+                              </span>
                             )}
                           </TableCell>
                           <TableCell className="h-14 py-0 px-5">
@@ -263,22 +341,34 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
                                     {getInitials(issue.reporter.username)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="text-sm text-foreground">{issue.reporter.username}</span>
+                                <span className="text-sm text-foreground">
+                                  {issue.reporter.username}
+                                </span>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground text-sm">—</span>
+                              <span className="text-muted-foreground text-sm">
+                                —
+                              </span>
                             )}
                           </TableCell>
                           <TableCell className="h-14 py-0 px-5">
                             <span className="text-sm text-muted-foreground tabular-nums">
-                              {format(new Date(issue.created_at), "MMM d, yyyy")}
+                              {format(
+                                new Date(issue.created_at),
+                                "MMM d, yyyy",
+                              )}
                             </span>
                           </TableCell>
                           {sprints.length > 0 && (
                             <TableCell className="h-14 py-0 px-5">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={isPending}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    disabled={isPending}
+                                  >
                                     Add to sprint
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -286,11 +376,22 @@ export function BacklogClient({ projects, selectedProjectId, issues, sprints }: 
                                   {sprints.map((s) => (
                                     <DropdownMenuItem
                                       key={s.id}
-                                      onClick={() => handleMoveToSprint(issue.id, s.id, s.name)}
+                                      onClick={() =>
+                                        handleMoveToSprint(
+                                          issue.id,
+                                          s.id,
+                                          s.name,
+                                        )
+                                      }
                                     >
                                       {s.name}
                                       {s.status === "active" && (
-                                        <Badge variant="secondary" className="ml-2 text-[10px]">Active</Badge>
+                                        <Badge
+                                          variant="secondary"
+                                          className="ml-2 text-[10px]"
+                                        >
+                                          Active
+                                        </Badge>
                                       )}
                                     </DropdownMenuItem>
                                   ))}

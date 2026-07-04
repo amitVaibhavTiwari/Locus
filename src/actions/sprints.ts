@@ -122,7 +122,7 @@ export async function startSprint(
 
 export async function completeSprint(
   sprintId: string,
-  incompleteAction: "backlog" | "next",
+  moveTarget: "backlog" | string, // "backlog" or a planned sprint ID
 ): Promise<{ error?: string }> {
   const session = await verifySession();
 
@@ -136,17 +136,7 @@ export async function completeSprint(
 
   const now = new Date().toISOString();
 
-  let targetSprintId: string | null = null;
-  if (incompleteAction === "next") {
-    const nextSprint = await db
-      .selectFrom("sprints")
-      .where("project_id", "=", sprint.project_id)
-      .where("status", "=", "planned")
-      .select(["id"])
-      .orderBy("created_at", "asc")
-      .executeTakeFirst();
-    targetSprintId = nextSprint?.id ?? null;
-  }
+  const targetSprintId: string | null = moveTarget === "backlog" ? null : moveTarget;
 
   await db
     .updateTable("issues")
@@ -171,7 +161,7 @@ export async function completeSprint(
         issue_id: null,
         user_id: session.user.id,
         type: "sprint_completed",
-        payload: JSON.stringify({ name: sprint.name, incompleteAction }),
+        payload: JSON.stringify({ name: sprint.name, moveTarget }),
         created_at: new Date().toISOString(),
       })
       .execute();

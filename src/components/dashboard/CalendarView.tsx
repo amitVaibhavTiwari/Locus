@@ -77,7 +77,6 @@ export function CalendarView({ tasks }: CalendarViewProps) {
 
   return (
     <div className="space-y-4">
-      {/* Calendar Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-foreground">{monthName}</h2>
         <div className="flex gap-2">
@@ -90,9 +89,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
         </div>
       </div>
 
-      {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-2">
-        {/* Day headers */}
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
           <div
             key={day}
@@ -102,12 +99,10 @@ export function CalendarView({ tasks }: CalendarViewProps) {
           </div>
         ))}
 
-        {/* Empty cells for days before month starts */}
         {emptyDays.map((_, index) => (
           <div key={`empty-${index}`} className="min-h-[120px]" />
         ))}
 
-        {/* Calendar days */}
         {days.map((day) => {
           const dayTasks = getTasksForDate(day);
           const isToday =
@@ -129,7 +124,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                 {dayTasks.map((task) => (
                   <ViewTaskDialog
                     key={task.id}
-                    task={task}
+                    issueId={task.id}
                     trigger={
                       <div
                         className={`px-2 py-1 text-xs cursor-pointer border-l-2 ${getPriorityColor(
