@@ -1,17 +1,11 @@
 "use client";
 import { useActionState, useState, useCallback } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Save, Sun, Moon, Pipette, Loader2 } from "lucide-react";
+import { Save, Sun, Moon, Pipette, Loader2, Archive } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
@@ -158,43 +152,37 @@ export function SettingsClient({
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
+    <div className="p-6 space-y-10">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground mb-1">Settings</h1>
         <p className="text-muted-foreground">
           Manage your workspace settings and preferences
         </p>
       </div>
 
-      {/* Appearance — client only, no DB */}
-      <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
-        <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>Customize the look and feel</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-sm font-medium">Dark Mode</Label>
-              <p className="text-xs text-muted-foreground">
-                Toggle between light and dark theme
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleTheme}
-              className="h-9 w-9"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </Button>
+      {/* Appearance */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Label className="text-base font-medium">Dark mode</Label>
+            <p className="text-sm text-muted-foreground">
+              Toggle between light and dark theme
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-9 w-9"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </section>
 
       <form action={saveAction}>
         <input
@@ -210,139 +198,122 @@ export function SettingsClient({
           readOnly
         />
 
-        <div className="space-y-6">
-          <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
-            <CardHeader>
-              <CardTitle>Workspace Settings</CardTitle>
-              <CardDescription>
-                Configure your workspace details
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Workspace name */}
-              <div className="space-y-2">
-                <Label htmlFor="workspace-name">Workspace Name</Label>
-                <Input
-                  id="workspace-name"
-                  name="name"
-                  defaultValue={initialWorkspaceName}
-                  placeholder="Enter workspace name"
+        <section className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="workspace-name">Workspace name</Label>
+            <Input
+              id="workspace-name"
+              name="name"
+              defaultValue={initialWorkspaceName}
+              placeholder="Enter workspace name"
+              className="max-w-md"
+            />
+            {saveState?.error && (
+              <p className="text-xs text-destructive">{saveState.error}</p>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-base">Theme color</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              {THEME_COLORS.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  onClick={() => selectPreset(color)}
+                  title={color.label}
+                  className={cn(
+                    "w-9 h-9 rounded-full border-2 transition-all",
+                    selectedPreset === color.value
+                      ? "border-foreground scale-110 shadow-md"
+                      : "border-transparent hover:scale-105",
+                  )}
+                  style={{ backgroundColor: `hsl(${color.hsl})` }}
                 />
-                {saveState?.error && (
-                  <p className="text-xs text-destructive">{saveState.error}</p>
-                )}
-              </div>
+              ))}
 
-              {/* Theme color */}
-              <div className="space-y-3 pt-4 border-t">
-                <Label>Theme Color</Label>
-                <div className="flex flex-wrap items-center gap-2">
-                  {THEME_COLORS.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      onClick={() => selectPreset(color)}
-                      title={color.label}
-                      className={cn(
-                        "w-9 h-9 rounded-full border-2 transition-all",
-                        selectedPreset === color.value
-                          ? "border-foreground scale-110 shadow-md"
-                          : "border-transparent hover:scale-105",
-                      )}
-                      style={{ backgroundColor: `hsl(${color.hsl})` }}
-                    />
-                  ))}
-
-                  {/* Custom color picker */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (selectedPreset !== "custom")
-                            selectCustom(activeHsl);
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedPreset !== "custom") selectCustom(activeHsl);
+                    }}
+                    title="Custom color"
+                    className={cn(
+                      "w-9 h-9 rounded-full border-2 transition-all flex items-center justify-center",
+                      selectedPreset === "custom"
+                        ? "border-foreground scale-110 shadow-md"
+                        : "border-border hover:scale-105 hover:border-muted-foreground",
+                    )}
+                    style={{
+                      backgroundColor:
+                        selectedPreset === "custom"
+                          ? `hsl(${activeHsl})`
+                          : "transparent",
+                    }}
+                  >
+                    {selectedPreset !== "custom" && (
+                      <Pipette className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-4" align="start">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Custom color</Label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={customHex}
+                        onChange={(e) => {
+                          const hex = e.target.value;
+                          setCustomHex(hex);
+                          const hsl = hexToHsl(hex);
+                          selectCustom(hsl);
                         }}
-                        title="Custom color"
-                        className={cn(
-                          "w-9 h-9 rounded-full border-2 transition-all flex items-center justify-center",
-                          selectedPreset === "custom"
-                            ? "border-foreground scale-110 shadow-md"
-                            : "border-border hover:scale-105 hover:border-muted-foreground",
-                        )}
-                        style={{
-                          backgroundColor:
-                            selectedPreset === "custom"
-                              ? `hsl(${activeHsl})`
-                              : "transparent",
-                        }}
-                      >
-                        {selectedPreset !== "custom" && (
-                          <Pipette className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-4" align="start">
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">
-                          Custom Color
-                        </Label>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="color"
-                            value={customHex}
-                            onChange={(e) => {
-                              const hex = e.target.value;
-                              setCustomHex(hex);
-                              const hsl = hexToHsl(hex);
-                              selectCustom(hsl);
-                            }}
-                            className="w-12 h-12 rounded-md cursor-pointer border-0 p-0"
-                          />
-                          <div className="flex flex-col gap-1">
-                            <Input
-                              value={customHex}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
-                                  setCustomHex(val);
-                                  if (val.length === 7) {
-                                    const hsl = hexToHsl(val);
-                                    selectCustom(hsl);
-                                  }
-                                }
-                              }}
-                              className="w-28 h-8 text-sm font-mono"
-                              placeholder="#f97316"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                              Hex color code
-                            </span>
-                          </div>
-                        </div>
+                        className="w-12 h-12 rounded-md cursor-pointer border-0 p-0"
+                      />
+                      <div className="flex flex-col gap-1">
+                        <Input
+                          value={customHex}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                              setCustomHex(val);
+                              if (val.length === 7) {
+                                const hsl = hexToHsl(val);
+                                selectCustom(hsl);
+                              }
+                            }
+                          }}
+                          className="w-28 h-8 text-sm font-mono"
+                          placeholder="#f97316"
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          Hex color code
+                        </span>
                       </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
 
-              {/* Allow admin invite */}
-              <div className="flex items-center justify-between pt-4 border-t">
-                <div className="space-y-0.5">
-                  <Label className="text-sm font-medium">
-                    Admins can invite members
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    When enabled, admins can send invitations. Only owners can
-                    remove members.
-                  </p>
-                </div>
-                <Switch
-                  checked={allowAdminInvite}
-                  onCheckedChange={(checked) => setAllowAdminInvite(checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-base font-medium">
+                Allow admins to invite members
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, admins can invite members to the workspace.
+              </p>
+            </div>
+            <Switch
+              checked={allowAdminInvite}
+              onCheckedChange={(checked) => setAllowAdminInvite(checked)}
+            />
+          </div>
 
           <div className="flex justify-end">
             <Button type="submit" disabled={isSaving}>
@@ -354,8 +325,30 @@ export function SettingsClient({
               Save Changes
             </Button>
           </div>
-        </div>
+        </section>
       </form>
+
+      {/* Archived projects */}
+      <section className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">
+            Archived Projects
+          </h2>
+        </div>
+        <div className="h-px bg-border" />
+        <div className="flex items-center justify-between gap-6">
+          <p className="text-muted-foreground">
+            View projects that have been archived. You can restore them from
+            their settings page.
+          </p>
+          <Button variant="outline" size="sm" asChild className="shrink-0">
+            <Link href="/projects/archived">
+              <Archive className="w-4 h-4 mr-2" />
+              View archived
+            </Link>
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

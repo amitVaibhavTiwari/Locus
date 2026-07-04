@@ -12,14 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -28,13 +20,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Trash2, AlertTriangle, Archive } from "lucide-react";
+import { Save, Archive, ArchiveRestore } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  updateProject,
-  archiveProject,
-  deleteProject,
-} from "@/actions/projects";
+import { updateProject, archiveProject } from "@/actions/projects";
 
 interface Project {
   id: string;
@@ -60,15 +48,14 @@ export function ProjectSettingsClient({
   const [projectName, setProjectName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
   const [visibility, setVisibility] = useState<string>(project.visibility);
-  const [allowComments, setAllowComments] = useState(true);
-  const [enableNotifications, setEnableNotifications] = useState(true);
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveConfirmText, setArchiveConfirmText] = useState("");
 
-  const expectedConfirmText = `delete ${project.name}`;
-  const canConfirmDelete =
-    deleteConfirmText.trim() === expectedConfirmText.trim();
+  const expectedArchiveText = `archive ${project.name}`;
+  const canConfirmArchive =
+    archiveConfirmText.trim().toLowerCase() ===
+    expectedArchiveText.toLowerCase();
 
   const handleSave = () => {
     const formData = new FormData();
@@ -88,13 +75,34 @@ export function ProjectSettingsClient({
       } else {
         toast({
           title: "Settings saved",
-          description: "Project settings have been updated successfully.",
+          description: "Project settings updated.",
         });
       }
     });
   };
 
   const handleArchive = () => {
+    if (!canConfirmArchive) return;
+    startTransition(async () => {
+      const result = await archiveProject(project.id);
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      setArchiveDialogOpen(false);
+      toast({
+        title: "Project archived",
+        description: "The project is now hidden from the projects list.",
+      });
+      router.push("/projects");
+    });
+  };
+
+  const handleRestore = () => {
     startTransition(async () => {
       const result = await archiveProject(project.id);
       if (result.error) {
@@ -105,252 +113,159 @@ export function ProjectSettingsClient({
         });
       } else {
         toast({
-          title: project.archived ? "Project restored" : "Project archived",
-          description: project.archived
-            ? "The project is now active again."
-            : "The project has been archived and hidden from the projects list.",
+          title: "Project restored",
+          description: "The project is active again.",
         });
         router.push("/projects");
       }
     });
   };
 
-  const handleDelete = () => {
-    if (!canConfirmDelete) return;
-    startTransition(async () => {
-      const result = await deleteProject(project.id);
-      if (result.error) {
-        toast({
-          title: "Error",
-          description: result.error,
-          variant: "destructive",
-        });
-        return;
-      }
-      setDeleteDialogOpen(false);
-      toast({
-        title: "Project deleted",
-        description: `"${project.name}" has been deleted.`,
-        variant: "destructive",
-      });
-      router.push("/projects");
-    });
-  };
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push(`/project/${project.id}`)}
-          className="mb-3 -ml-2 hover:bg-transparent text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="text-3xl font-bold text-foreground mb-2">
+    <div className="p-6 space-y-10">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground mb-1">
           Project Settings
         </h1>
-        <p className="text-muted-foreground">
-          Manage how this project behaves for everyone on the team
+        <p className="text-muted-foreground text-sm">
+          Manage how this project appears and behaves for your team
         </p>
       </div>
 
-      {/* General */}
-      <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
-        <CardHeader>
-          <CardTitle>General</CardTitle>
-          <CardDescription>
-            Basic project information shown across the workspace
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="project-name">Project name</Label>
-            <Input
-              id="project-name"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-            />
-            <p className="text-xs text-muted-foreground">
-              A short summary helps new members get up to speed.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="visibility">Visibility</Label>
-            <Select value={visibility} onValueChange={setVisibility}>
-              <SelectTrigger id="visibility">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="private">
-                  Private — only invited members
-                </SelectItem>
-                <SelectItem value="public">
-                  Public — anyone in the workspace
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="project-name">Project name</Label>
+          <Input
+            id="project-name"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            className="max-w-lg"
+          />
+        </div>
 
-      {/* Preferences */}
-      <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
-        <CardHeader>
-          <CardTitle>Preferences</CardTitle>
-          <CardDescription>
-            Control collaboration and notification behavior
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="comments" className="text-sm font-medium">
-                Allow comments
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Let members comment on tasks and discussions.
-              </p>
-            </div>
-            <Switch
-              id="comments"
-              checked={allowComments}
-              onCheckedChange={setAllowComments}
-            />
-          </div>
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div className="space-y-0.5">
-              <Label htmlFor="notifications" className="text-sm font-medium">
-                Email notifications
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Send activity digests and mentions over email.
-              </p>
-            </div>
-            <Switch
-              id="notifications"
-              checked={enableNotifications}
-              onCheckedChange={setEnableNotifications}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <div className="space-y-2">
+          <Label htmlFor="description">Description</Label>
+          <Input
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave}>
-          <Save className="w-4 h-4 mr-2" />
-          Save Changes
-        </Button>
-      </div>
+        <div className="space-y-2">
+          <Label htmlFor="visibility">Visibility</Label>
+          <Select value={visibility} onValueChange={setVisibility}>
+            <SelectTrigger id="visibility" className="max-w-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="private">Private</SelectItem>
+              <SelectItem value="public">Public</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-      {/* Danger Zone */}
-      <Card className="bg-card border border-destructive/40 hover:shadow-md transition-shadow duration-200">
-        <CardHeader>
-          <CardTitle className="text-destructive">Danger Zone</CardTitle>
-          <CardDescription>
-            Irreversible actions. Proceed carefully.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
+        <div className="flex justify-end">
+          <Button onClick={handleSave}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Changes
+          </Button>
+        </div>
+      </section>
+
+      {userRole === "owner" && (
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-base font-semibold text-destructive">
+              Danger Zone
+            </h2>
+            {/* <p className="text-xs text-muted-foreground mt-0.5">
+              These actions are hard to undo. Be careful.
+            </p> */}
+          </div>
+
+          <div className="flex items-center justify-between gap-6">
             <div>
-              <div className="text-sm font-medium text-foreground">
+              <p className="text-sm font-medium text-foreground">
                 {project.archived ? "Restore project" : "Archive project"}
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5">
                 {project.archived
-                  ? "Make this project active and visible again."
-                  : "Hide this project from the projects list. You can restore it later."}
+                  ? "Make this project active and visible to the team again."
+                  : "Hide this project from the projects list. It can be restored later."}
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleArchive}>
-              <Archive className="w-4 h-4 mr-2" />
-              {project.archived ? "Restore" : "Archive"}
-            </Button>
-          </div>
-
-          {userRole === "owner" && (
-            <div className="flex items-center justify-between gap-4 pt-4 border-t border-border">
-              <div>
-                <div className="text-sm font-medium text-foreground">
-                  Delete this project
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  All tasks, epics, and sprints will be permanently removed.
-                </p>
-              </div>
+            {project.archived ? (
+              <Button variant="outline" size="sm" onClick={handleRestore}>
+                <ArchiveRestore className="w-4 h-4 mr-2" />
+                Restore
+              </Button>
+            ) : (
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
+                className="border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
                 onClick={() => {
-                  setDeleteConfirmText("");
-                  setDeleteDialogOpen(true);
+                  setArchiveConfirmText("");
+                  setArchiveDialogOpen(true);
                 }}
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
+                <Archive className="w-4 h-4 mr-2" />
+                Archive
               </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </div>
+        </section>
+      )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="w-5 h-5" />
-              Delete project
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader className="text-center items-center gap-1">
+            <DialogTitle className="text-xl font-semibold">
+              Archive this project?
             </DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. All tasks, epics, and sprints in{" "}
-              <span className="font-semibold text-foreground">
-                {project.name}
-              </span>{" "}
-              will be permanently removed.
+            <DialogDescription className="text-center">
+              <span className="font-semibold"> {project.name}</span> will be
+              hidden from the projects list but can be restored later.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-delete">
-              Type{" "}
-              <span className="font-mono text-foreground">
-                delete {project.name}
-              </span>{" "}
-              to confirm
+
+          <div className="space-y-1.5 mt-4">
+            <Label
+              htmlFor="archive-confirm"
+              className="text-center font font-semibold block"
+            >
+              Type below text to confirm
             </Label>
+            <p className=" text-sm text-center text-foreground/70 tracking-wide select-none">
+              Archive {project.name}
+            </p>
             <Input
-              id="confirm-delete"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder={`delete ${project.name}`}
+              id="archive-confirm"
+              value={archiveConfirmText}
+              onChange={(e) => setArchiveConfirmText(e.target.value)}
+              // placeholder={`archive ${project.name}`}
               autoComplete="off"
+              className="text-center"
+              onKeyDown={(e) => e.key === "Enter" && handleArchive()}
             />
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="flex-row gap-2">
             <Button
               variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
+              className="flex-1"
+              onClick={() => setArchiveDialogOpen(false)}
             >
               Cancel
             </Button>
             <Button
-              variant="destructive"
-              disabled={!canConfirmDelete}
-              onClick={handleDelete}
+              className="flex-1"
+              disabled={!canConfirmArchive}
+              onClick={handleArchive}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete project
+              <Archive className="w-4 h-4 mr-2" />
+              Archive
             </Button>
           </DialogFooter>
         </DialogContent>
