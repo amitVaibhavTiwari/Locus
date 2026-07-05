@@ -1,15 +1,31 @@
 import { redirect } from "next/navigation";
-import { getActiveOrg, getMyAssignedIssues, getSessionUser } from "@/lib/dal";
+import { Suspense } from "react";
+import {
+  getActiveOrg,
+  getMyAssignedIssues,
+  getMyAssignedProjectNames,
+  getSessionUser,
+} from "@/lib/dal";
 import { db } from "@/lib/db";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import type { NoteData, LinkData } from "@/components/dashboard/NotesSection";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; project?: string; sort?: string }>;
+}) {
+  const params = await searchParams;
   const [org, user] = await Promise.all([getActiveOrg(), getSessionUser()]);
   if (!org || !user) redirect("/login");
 
-  const [tasks, rawNotes, rawLinks] = await Promise.all([
-    getMyAssignedIssues(org.id, user.id),
+  const search = params.q?.trim() || undefined;
+  const project = params.project || undefined;
+  const sort = params.sort || undefined;
+
+  const [tasks, projects, rawNotes, rawLinks] = await Promise.all([
+    getMyAssignedIssues(org.id, user.id, search, project, sort),
+    getMyAssignedProjectNames(org.id, user.id),
     db
       .selectFrom("notes")
       .where("user_id", "=", user.id)
@@ -72,11 +88,14 @@ export default async function DashboardPage() {
   }));
 
   return (
-    <DashboardOverview
-      tasks={tasks}
-      username={user.username}
-      initialNotes={notes}
-      initialLinks={links}
-    />
+    <Suspense>
+      <DashboardOverview
+        tasks={tasks}
+        username={user.username}
+        initialNotes={notes}
+        initialLinks={links}
+        projects={projects}
+      />
+    </Suspense>
   );
 }

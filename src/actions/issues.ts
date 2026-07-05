@@ -280,7 +280,8 @@ export async function updateIssue(
   const dueDate = formData.get("due_date")?.toString() || null;
   const epicId = formData.get("epic_id")?.toString() || null;
   const sprintIdRaw = formData.get("sprint_id")?.toString();
-  const sprintId = sprintIdRaw && sprintIdRaw !== "__none__" ? sprintIdRaw : null;
+  const sprintId =
+    sprintIdRaw && sprintIdRaw !== "__none__" ? sprintIdRaw : null;
   const editPermission = formData.get("edit_permission")?.toString() as
     | "anyone"
     | "assignee_only"
@@ -512,7 +513,7 @@ export async function archiveIssue(
   const issue = await db
     .selectFrom("issues")
     .where("id", "=", issueId)
-    .select(["project_id", "organization_id"])
+    .select(["project_id", "organization_id", "sprint_id", "epic_id"])
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
 
@@ -525,6 +526,13 @@ export async function archiveIssue(
     .executeTakeFirst();
 
   if (!membership) return { error: "Only project managers can archive tasks" };
+
+  if (issue.sprint_id) {
+    return { error: "Remove this task from its sprint before archiving." };
+  }
+  if (issue.epic_id) {
+    return { error: "Remove this task from its epic before archiving." };
+  }
 
   await db
     .updateTable("issues")

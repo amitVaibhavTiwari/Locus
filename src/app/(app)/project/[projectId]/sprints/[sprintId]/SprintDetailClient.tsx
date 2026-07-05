@@ -30,7 +30,10 @@ import {
   Search,
   History,
   Pencil,
+  Flag,
+  Calendar,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,6 +92,20 @@ interface SprintDetailClientProps {
   sprint: Sprint;
   issues: Issue[];
   hasActiveSprint: boolean;
+}
+
+function getPriorityColor(priority: string) {
+  switch (priority) {
+    case "high":
+    case "highest":
+      return "border-destructive text-destructive";
+    case "medium":
+      return "border-warning text-warning";
+    case "low":
+      return "border-success text-success";
+    default:
+      return "border-muted-foreground text-muted-foreground";
+  }
 }
 
 function getInitials(name: string) {
@@ -885,35 +902,72 @@ export function SprintDetailClient({
                 : "No tasks match the current filters."}
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredIssues.map((issue) => (
                 <ViewTaskDialog
                   key={issue.id}
                   issueId={issue.id}
                   trigger={
-                    <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg hover:border-primary/30 hover:shadow-md transition-all duration-200 cursor-pointer">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {issue.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
+                    <div className="p-4 bg-card border border-border rounded-lg hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer flex flex-col gap-2 h-full">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="shrink-0">
                           TASK-{issue.issue_number}
-                          {issue.assignee && ` • ${issue.assignee.username}`}
-                        </p>
+                        </span>
+                        {issue.assignee && (
+                          <>
+                            <span className="text-border shrink-0">·</span>
+                            <span className="font-medium truncate max-w-30">
+                              {issue.assignee.username}
+                            </span>
+                          </>
+                        )}
                       </div>
-                      <div className="text-right text-xs text-muted-foreground">
-                        <p>
-                          Status:{" "}
-                          <span className="text-foreground font-medium capitalize">
-                            {issue.status.replace("-", " ")}
-                          </span>
-                        </p>
-                        <p>
-                          Priority:{" "}
-                          <span className="text-foreground font-medium capitalize">
-                            {issue.priority}
-                          </span>
-                        </p>
+                      <p
+                        className={`font-medium text-sm leading-snug line-clamp-2 ${issue.completed_at ? "text-muted-foreground line-through" : "text-foreground"}`}
+                      >
+                        {issue.title.length > 80
+                          ? issue.title.slice(0, 80) + "…"
+                          : issue.title}
+                      </p>
+                      <div className="flex items-center justify-between gap-2 mt-auto pt-1">
+                        <div className="flex gap-1 flex-wrap">
+                          {issue.labels.slice(0, 2).map((label, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="secondary"
+                              className="text-xs py-0 max-w-20 truncate"
+                            >
+                              {label}
+                            </Badge>
+                          ))}
+                          {issue.labels.length > 2 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{issue.labels.length - 2}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${getPriorityColor(issue.priority)}`}
+                          >
+                            <Flag className="w-3 h-3 mr-1" />
+                            {issue.priority.charAt(0).toUpperCase() +
+                              issue.priority.slice(1)}
+                          </Badge>
+                          {issue.due_date && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(issue.due_date).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   }

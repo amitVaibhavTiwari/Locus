@@ -215,6 +215,7 @@ export const getSprintIssues = cache(async (sprintId: string) => {
     .selectFrom("issues")
     .where("sprint_id", "=", sprintId)
     .where("parent_issue_id", "is", null)
+    .where("archived", "=", 0)
     .select([
       "id",
       "issue_number",
@@ -685,14 +686,44 @@ export const getOrgSprintSummaries = cache(async (orgId: string) => {
   return { activeSprint, completedSprints };
 });
 
-export const getMyAssignedIssues = cache(
+export const getMyAssignedProjectNames = cache(
   async (orgId: string, userId: string) => {
+    const rows = await db
+      .selectFrom("issues")
+      .innerJoin("projects", "projects.id", "issues.project_id")
+      .where("issues.organization_id", "=", orgId)
+      .where("issues.assignee_id", "=", userId)
+      .where("issues.completed_at", "is", null)
+      .select("projects.name")
+      .distinct()
+      .orderBy("projects.name", "asc")
+      .execute();
+    return rows.map((r) => r.name);
+  },
+);
+
+export const getMyAssignedIssues = cache(
+  async (
+    orgId: string,
+    userId: string,
+    search?: string,
+    project?: string,
+    sort?: string,
+  ) => {
     const issues = await db
       .selectFrom("issues")
       .innerJoin("projects", "projects.id", "issues.project_id")
       .where("issues.organization_id", "=", orgId)
       .where("issues.assignee_id", "=", userId)
       .where("issues.parent_issue_id", "is", null)
+      .where("issues.completed_at", "is", null)
+      .where("issues.archived", "=", 0)
+      .$if(!!search, (qb) =>
+        qb.where("issues.title", "like", `%${search}%`),
+      )
+      .$if(!!project, (qb) =>
+        qb.where("projects.name", "=", project!),
+      )
       .select([
         "issues.id",
         "issues.issue_number",
@@ -706,7 +737,7 @@ export const getMyAssignedIssues = cache(
         "issues.created_at",
         "projects.name as project_name",
       ])
-      .orderBy("issues.due_date", "asc")
+      .orderBy("issues.due_date", sort === "deadline-desc" ? "desc" : "asc")
       .execute();
 
     if (issues.length === 0) return [];
