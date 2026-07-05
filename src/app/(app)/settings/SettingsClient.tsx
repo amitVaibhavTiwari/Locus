@@ -1,11 +1,10 @@
 "use client";
 import { useActionState, useState, useCallback } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Save, Sun, Moon, Pipette, Loader2, Archive } from "lucide-react";
+import { Save, Sun, Moon, Pipette, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
@@ -160,7 +159,6 @@ export function SettingsClient({
         </p>
       </div>
 
-      {/* Appearance */}
       <section className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
@@ -327,28 +325,6 @@ export function SettingsClient({
           </div>
         </section>
       </form>
-
-      {/* Archived projects */}
-      <section className="space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Archived Projects
-          </h2>
-        </div>
-        <div className="h-px bg-border" />
-        <div className="flex items-center justify-between gap-6">
-          <p className="text-muted-foreground">
-            View projects that have been archived. You can restore them from
-            their settings page.
-          </p>
-          <Button variant="outline" size="sm" asChild className="shrink-0">
-            <Link href="/projects/archived">
-              <Archive className="w-4 h-4 mr-2" />
-              View archived
-            </Link>
-          </Button>
-        </div>
-      </section>
     </div>
   );
 }

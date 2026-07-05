@@ -11,6 +11,7 @@ import {
   Pin,
   PinOff,
   Loader2,
+  Archive,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 import { pinProject, unpinProject } from "@/actions/projects";
 import { formatDateTime } from "@/lib/date";
 
@@ -35,6 +37,7 @@ interface ProjectsClientProps {
   initialHasMore: boolean;
   initialTotal: number;
   pinnedIds: string[];
+  userRole: "owner" | "admin" | "member";
 }
 
 export function ProjectsClient({
@@ -42,6 +45,7 @@ export function ProjectsClient({
   initialHasMore,
   initialTotal,
   pinnedIds: initialPinnedIds,
+  userRole,
 }: ProjectsClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -158,13 +162,23 @@ export function ProjectsClient({
             Manage all your projects and track their progress
           </p>
         </div>
-        <Button
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          onClick={() => router.push("/projects/new")}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-2">
+          {userRole === "owner" && (
+            <Button variant="outline" asChild>
+              <Link href="/projects/archived">
+                <Archive className="w-4 h-4 mr-2" />
+                See Archived Projects
+              </Link>
+            </Button>
+          )}
+          <Button
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            onClick={() => router.push("/projects/new")}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       <div className="relative w-full max-w-md">
@@ -185,7 +199,6 @@ export function ProjectsClient({
             onClick={() => router.push(`/project/${project.id}`)}
           >
             <div className="flex items-center gap-4 flex-1">
-              <div className="w-3 h-3 rounded-full bg-primary/60" />
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
                   {project.name}

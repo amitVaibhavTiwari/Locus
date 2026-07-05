@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   Plus,
   Edit,
@@ -51,27 +51,47 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  createNote,
+  updateNote,
+  deleteNote,
+  reorderNotes,
+  toggleNoteItem,
+} from "@/actions/notes";
+import {
+  createLink,
+  updateLink,
+  deleteLink,
+  reorderLinks,
+} from "@/actions/links";
 
-interface ChecklistItem {
+export interface NoteItemData {
   id: string;
   text: string;
   checked: boolean;
+  rank: number;
 }
 
-interface Note {
+export interface NoteData {
   id: string;
   type: "text" | "checklist";
   title: string;
-  content?: string;
-  items?: ChecklistItem[];
-  timestamp: Date;
+  content: string | null;
+  items: NoteItemData[];
+  created_at: string;
 }
 
-interface ImportantLink {
+export interface LinkData {
   id: string;
-  url: string;
   label: string;
-  tags?: string[];
+  url: string;
+  tags: string[];
+  rank: number;
+}
+
+interface NotesSectionProps {
+  initialNotes: NoteData[];
+  initialLinks: LinkData[];
 }
 
 const SortableNote = ({
@@ -80,10 +100,10 @@ const SortableNote = ({
   onToggleItem,
   onEdit,
 }: {
-  note: Note;
+  note: NoteData;
   onDelete: (id: string) => void;
   onToggleItem: (noteId: string, itemId: string) => void;
-  onEdit: (note: Note) => void;
+  onEdit: (note: NoteData) => void;
 }) => {
   const {
     attributes,
@@ -102,8 +122,8 @@ const SortableNote = ({
     scale: isDragging ? 1.02 : 1,
   };
 
-  const completedItems = note.items?.filter((item) => item.checked).length || 0;
-  const totalItems = note.items?.length || 0;
+  const completedItems = note.items.filter((i) => i.checked).length;
+  const totalItems = note.items.length;
 
   return (
     <div
@@ -130,7 +150,7 @@ const SortableNote = ({
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              {note.timestamp.toLocaleDateString("en-US", {
+              {new Date(note.created_at).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
@@ -169,7 +189,7 @@ const SortableNote = ({
         </p>
       ) : (
         <div className="space-y-2 mt-3 ml-7">
-          {note.items?.map((item) => (
+          {note.items.map((item) => (
             <div key={item.id} className="flex items-center gap-2">
               <Checkbox
                 checked={item.checked}
@@ -195,9 +215,9 @@ const SortableLink = ({
   onEdit,
   onCopy,
 }: {
-  link: ImportantLink;
+  link: LinkData;
   onDelete: (id: string) => void;
-  onEdit: (link: ImportantLink) => void;
+  onEdit: (link: LinkData) => void;
   onCopy: (url: string) => void;
 }) => {
   const {
@@ -233,7 +253,11 @@ const SortableLink = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <a
-                href={link.url}
+                href={
+                  /^https?:\/\//i.test(link.url)
+                    ? link.url
+                    : `https://${link.url}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1.5 truncate"
@@ -246,7 +270,7 @@ const SortableLink = ({
             <p className="text-xs text-muted-foreground truncate mb-2">
               {link.url}
             </p>
-            {link.tags && link.tags.length > 0 && (
+            {link.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {link.tags.map((tag, idx) => (
                   <Badge
@@ -301,284 +325,298 @@ const SortableLink = ({
   );
 };
 
-export function NotesSection() {
-  const [notes, setNotes] = useState<Note[]>([
-    {
-      id: "1",
-      type: "text",
-      title: "Team Meeting Notes",
-      content:
-        "Discussed Q1 goals and project timelines. Sarah to follow up on resource allocation.",
-      timestamp: new Date(),
-    },
-    {
-      id: "2",
-      type: "checklist",
-      title: "Sprint Tasks",
-      items: [
-        { id: "c1", text: "Complete user authentication", checked: true },
-        { id: "c2", text: "Review pull requests", checked: false },
-        { id: "c3", text: "Update documentation", checked: false },
-      ],
-      timestamp: new Date(),
-    },
-  ]);
-
-  const [links, setLinks] = useState<ImportantLink[]>([
-    {
-      id: "1",
-      url: "https://docs.example.com",
-      label: "API Documentation",
-      tags: ["docs", "backend"],
-    },
-    {
-      id: "2",
-      url: "https://design.example.com",
-      label: "Design System",
-      tags: ["design", "ui"],
-    },
-    {
-      id: "3",
-      url: "https://jira.example.com",
-      label: "Project Board",
-      tags: ["project"],
-    },
-  ]);
+export function NotesSection({
+  initialNotes,
+  initialLinks,
+}: NotesSectionProps) {
+  const [notes, setNotes] = useState<NoteData[]>(initialNotes);
+  const [links, setLinks] = useState<LinkData[]>(initialLinks);
 
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
-  const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [editingLink, setEditingLink] = useState<ImportantLink | null>(null);
+  const [editingNote, setEditingNote] = useState<NoteData | null>(null);
+  const [editingLink, setEditingLink] = useState<LinkData | null>(null);
   const [newNoteType, setNewNoteType] = useState<"text" | "checklist">("text");
   const [newNoteTitle, setNewNoteTitle] = useState("");
   const [newNoteContent, setNewNoteContent] = useState("");
-  const [checklistItems, setChecklistItems] = useState<string[]>([""]);
+  const [checklistItems, setChecklistItems] = useState<
+    { text: string; checked: boolean }[]
+  >([{ text: "", checked: false }]);
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkTags, setNewLinkTags] = useState("");
 
-  // Delete confirmation states
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
   const [deleteLinkId, setDeleteLinkId] = useState<string | null>(null);
 
-  const { toast } = useToast();
+  const [, startTransition] = useTransition();
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
 
-  const addNote = () => {
-    if (!newNoteTitle.trim()) {
-      toast({
-        title: "Error",
-        description: "Note title is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (editingNote) {
-      setNotes(
-        notes.map((note) =>
-          note.id === editingNote.id
-            ? {
-                ...note,
-                title: newNoteTitle,
-                content: newNoteType === "text" ? newNoteContent : undefined,
-                items:
-                  newNoteType === "checklist"
-                    ? checklistItems
-                        .filter((item) => item.trim())
-                        .map((text, index) => ({
-                          id: `item-${index}`,
-                          text,
-                          checked: note.items?.[index]?.checked || false,
-                        }))
-                    : undefined,
-              }
-            : note,
-        ),
-      );
-      toast({
-        title: "Note updated",
-        description: "Your note has been updated successfully.",
-      });
-    } else {
-      const note: Note = {
-        id: Date.now().toString(),
-        type: newNoteType,
-        title: newNoteTitle,
-        content: newNoteType === "text" ? newNoteContent : undefined,
-        items:
-          newNoteType === "checklist"
-            ? checklistItems
-                .filter((item) => item.trim())
-                .map((text, index) => ({
-                  id: `item-${index}`,
-                  text,
-                  checked: false,
-                }))
-            : undefined,
-        timestamp: new Date(),
-      };
-
-      setNotes([...notes, note]);
-      toast({
-        title: "Note added",
-        description: "Your note has been added successfully.",
-      });
-    }
-
+  const resetNoteDialog = () => {
     setEditingNote(null);
     setNewNoteTitle("");
     setNewNoteContent("");
-    setChecklistItems([""]);
-    setNoteDialogOpen(false);
+    setChecklistItems([{ text: "", checked: false }]);
+    setNewNoteType("text");
   };
 
-  const addLink = () => {
-    if (!newLinkLabel.trim() || !newLinkUrl.trim()) {
-      toast({
-        title: "Error",
-        description: "Label and URL are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (editingLink) {
-      setLinks(
-        links.map((link) =>
-          link.id === editingLink.id
-            ? {
-                ...link,
-                url: newLinkUrl,
-                label: newLinkLabel,
-                tags: newLinkTags
-                  ? newLinkTags.split(",").map((tag) => tag.trim())
-                  : undefined,
-              }
-            : link,
-        ),
-      );
-      toast({
-        title: "Link updated",
-        description: "Your link has been updated successfully.",
-      });
-    } else {
-      const link: ImportantLink = {
-        id: Date.now().toString(),
-        url: newLinkUrl,
-        label: newLinkLabel,
-        tags: newLinkTags
-          ? newLinkTags.split(",").map((tag) => tag.trim())
-          : undefined,
-      };
-
-      setLinks([...links, link]);
-      toast({
-        title: "Link added",
-        description: "Your link has been added successfully.",
-      });
-    }
-
+  const resetLinkDialog = () => {
     setEditingLink(null);
     setNewLinkLabel("");
     setNewLinkUrl("");
     setNewLinkTags("");
+  };
+
+  const handleSaveNote = () => {
+    if (!newNoteTitle.trim()) {
+      toast.error("Note title is required");
+      return;
+    }
+
+    if (editingNote) {
+      const updatedItems =
+        newNoteType === "checklist"
+          ? checklistItems
+              .filter((i) => i.text.trim())
+              .map((i, idx) => ({
+                id: crypto.randomUUID(),
+                text: i.text,
+                checked: i.checked,
+                rank: idx,
+              }))
+          : [];
+
+      setNotes((prev) =>
+        prev.map((n) =>
+          n.id === editingNote.id
+            ? {
+                ...n,
+                title: newNoteTitle,
+                type: newNoteType,
+                content: newNoteType === "text" ? newNoteContent : null,
+                items: updatedItems,
+              }
+            : n,
+        ),
+      );
+
+      startTransition(async () => {
+        const res = await updateNote(editingNote.id, {
+          title: newNoteTitle,
+          type: newNoteType,
+          content: newNoteContent,
+          items: checklistItems.filter((i) => i.text.trim()),
+        });
+        if (res.error) toast.error(res.error);
+        else toast.success("Note updated");
+      });
+    } else {
+      const tempId = crypto.randomUUID();
+      const tempNote: NoteData = {
+        id: tempId,
+        type: newNoteType,
+        title: newNoteTitle,
+        content: newNoteType === "text" ? newNoteContent : null,
+        items:
+          newNoteType === "checklist"
+            ? checklistItems
+                .filter((i) => i.text.trim())
+                .map((i, idx) => ({
+                  id: crypto.randomUUID(),
+                  text: i.text,
+                  checked: false,
+                  rank: idx,
+                }))
+            : [],
+        created_at: new Date().toISOString(),
+      };
+      setNotes((prev) => [...prev, tempNote]);
+
+      startTransition(async () => {
+        const res = await createNote({
+          type: newNoteType,
+          title: newNoteTitle,
+          content: newNoteContent,
+          items: checklistItems.filter((i) => i.text.trim()).map((i) => i.text),
+        });
+        if (res.error) {
+          toast.error(res.error);
+          setNotes((prev) => prev.filter((n) => n.id !== tempId));
+        } else if (res.note) {
+          setNotes((prev) =>
+            prev.map((n) => (n.id === tempId ? res.note! : n)),
+          );
+          toast.success("Note added");
+        }
+      });
+    }
+
+    resetNoteDialog();
+    setNoteDialogOpen(false);
+  };
+
+  const handleSaveLink = () => {
+    if (!newLinkLabel.trim() || !newLinkUrl.trim()) {
+      toast.error("Label and URL are required");
+      return;
+    }
+
+    if (editingLink) {
+      const tags = newLinkTags
+        ? newLinkTags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [];
+      setLinks((prev) =>
+        prev.map((l) =>
+          l.id === editingLink.id
+            ? { ...l, label: newLinkLabel, url: newLinkUrl, tags }
+            : l,
+        ),
+      );
+
+      startTransition(async () => {
+        const res = await updateLink(editingLink.id, {
+          label: newLinkLabel,
+          url: newLinkUrl,
+          tags: newLinkTags,
+        });
+        if (res.error) toast.error(res.error);
+        else toast.success("Link updated");
+      });
+    } else {
+      const tempId = crypto.randomUUID();
+      const tempLink: LinkData = {
+        id: tempId,
+        label: newLinkLabel,
+        url: newLinkUrl,
+        tags: newLinkTags
+          ? newLinkTags
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : [],
+        rank: links.length,
+      };
+      setLinks((prev) => [...prev, tempLink]);
+
+      startTransition(async () => {
+        const res = await createLink({
+          label: newLinkLabel,
+          url: newLinkUrl,
+          tags: newLinkTags,
+        });
+        if (res.error) {
+          toast.error(res.error);
+          setLinks((prev) => prev.filter((l) => l.id !== tempId));
+        } else if (res.link) {
+          setLinks((prev) =>
+            prev.map((l) => (l.id === tempId ? res.link! : l)),
+          );
+          toast.success("Link added");
+        }
+      });
+    }
+
+    resetLinkDialog();
     setLinkDialogOpen(false);
   };
 
-  const confirmDeleteNote = () => {
-    if (deleteNoteId) {
-      setNotes(notes.filter((note) => note.id !== deleteNoteId));
-      toast({
-        title: "Note deleted",
-        description: "The note has been removed.",
-      });
-      setDeleteNoteId(null);
-    }
+  const handleConfirmDeleteNote = () => {
+    if (!deleteNoteId) return;
+    const id = deleteNoteId;
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    setDeleteNoteId(null);
+    startTransition(async () => {
+      const res = await deleteNote(id);
+      if (res.error) toast.error(res.error);
+      else toast.success("Note deleted");
+    });
   };
 
-  const confirmDeleteLink = () => {
-    if (deleteLinkId) {
-      setLinks(links.filter((link) => link.id !== deleteLinkId));
-      toast({
-        title: "Link deleted",
-        description: "The link has been removed.",
-      });
-      setDeleteLinkId(null);
-    }
+  const handleConfirmDeleteLink = () => {
+    if (!deleteLinkId) return;
+    const id = deleteLinkId;
+    setLinks((prev) => prev.filter((l) => l.id !== id));
+    setDeleteLinkId(null);
+    startTransition(async () => {
+      const res = await deleteLink(id);
+      if (res.error) toast.error(res.error);
+      else toast.success("Link deleted");
+    });
   };
 
-  const toggleChecklistItem = (noteId: string, itemId: string) => {
-    setNotes(
-      notes.map((note) => {
-        if (note.id === noteId && note.items) {
-          return {
-            ...note,
-            items: note.items.map((item) =>
-              item.id === itemId ? { ...item, checked: !item.checked } : item,
-            ),
-          };
-        }
-        return note;
-      }),
+  const handleToggleItem = (noteId: string, itemId: string) => {
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === noteId
+          ? {
+              ...n,
+              items: n.items.map((i) =>
+                i.id === itemId ? { ...i, checked: !i.checked } : i,
+              ),
+            }
+          : n,
+      ),
     );
-  };
-
-  const copyLink = (url: string) => {
-    navigator.clipboard.writeText(url);
-    toast({
-      title: "Link copied",
-      description: "The link has been copied to your clipboard.",
+    startTransition(async () => {
+      const res = await toggleNoteItem(noteId, itemId);
+      if (res.error) toast.error(res.error);
     });
   };
 
   const handleNoteDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setNotes((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
-      });
-    }
+    if (!over || active.id === over.id) return;
+    const oldIndex = notes.findIndex((i) => i.id === active.id);
+    const newIndex = notes.findIndex((i) => i.id === over.id);
+    const reordered = arrayMove(notes, oldIndex, newIndex);
+    setNotes(reordered);
+    startTransition(() => reorderNotes(reordered.map((n) => n.id)));
   };
 
   const handleLinkDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setLinks((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
-      });
-    }
+    if (!over || active.id === over.id) return;
+    const oldIndex = links.findIndex((i) => i.id === active.id);
+    const newIndex = links.findIndex((i) => i.id === over.id);
+    const reordered = arrayMove(links, oldIndex, newIndex);
+    setLinks(reordered);
+    startTransition(() => reorderLinks(reordered.map((l) => l.id)));
   };
 
-  const handleEditNote = (note: Note) => {
+  const handleEditNote = (note: NoteData) => {
     setEditingNote(note);
     setNewNoteType(note.type);
     setNewNoteTitle(note.title);
-    setNewNoteContent(note.content || "");
-    setChecklistItems(note.items?.map((item) => item.text) || [""]);
+    setNewNoteContent(note.content ?? "");
+    setChecklistItems(
+      note.items.length > 0
+        ? note.items.map((i) => ({ text: i.text, checked: i.checked }))
+        : [{ text: "", checked: false }],
+    );
     setNoteDialogOpen(true);
   };
 
-  const handleEditLink = (link: ImportantLink) => {
+  const handleEditLink = (link: LinkData) => {
     setEditingLink(link);
     setNewLinkLabel(link.label);
     setNewLinkUrl(link.url);
-    setNewLinkTags(link.tags?.join(", ") || "");
+    setNewLinkTags(link.tags.join(", "));
     setLinkDialogOpen(true);
+  };
+
+  const copyLink = (url: string) => {
+    const normalized = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    navigator.clipboard.writeText(normalized);
+    toast.success("Link copied to clipboard");
   };
 
   const noteToDelete = notes.find((n) => n.id === deleteNoteId);
@@ -601,12 +639,7 @@ export function NotesSection() {
                 open={noteDialogOpen}
                 onOpenChange={(open) => {
                   setNoteDialogOpen(open);
-                  if (!open) {
-                    setEditingNote(null);
-                    setNewNoteTitle("");
-                    setNewNoteContent("");
-                    setChecklistItems([""]);
-                  }
+                  if (!open) resetNoteDialog();
                 }}
               >
                 <DialogTrigger asChild>
@@ -674,16 +707,19 @@ export function NotesSection() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <Label htmlFor="checklist-item">Checklist Items</Label>
+                        <Label>Checklist Items</Label>
                         <div className="space-y-2">
                           {checklistItems.map((item, index) => (
                             <div key={index} className="flex gap-2">
                               <Input
-                                value={item}
+                                value={item.text}
                                 onChange={(e) => {
-                                  const newItems = [...checklistItems];
-                                  newItems[index] = e.target.value;
-                                  setChecklistItems(newItems);
+                                  const next = [...checklistItems];
+                                  next[index] = {
+                                    ...next[index],
+                                    text: e.target.value,
+                                  };
+                                  setChecklistItems(next);
                                 }}
                                 placeholder="Enter item"
                               />
@@ -707,7 +743,10 @@ export function NotesSection() {
                             type="button"
                             variant="outline"
                             onClick={() =>
-                              setChecklistItems([...checklistItems, ""])
+                              setChecklistItems([
+                                ...checklistItems,
+                                { text: "", checked: false },
+                              ])
                             }
                             className="w-full"
                           >
@@ -724,7 +763,7 @@ export function NotesSection() {
                       >
                         Cancel
                       </Button>
-                      <Button onClick={addNote}>
+                      <Button onClick={handleSaveNote}>
                         {editingNote ? "Save Changes" : "Add Note"}
                       </Button>
                     </div>
@@ -757,7 +796,7 @@ export function NotesSection() {
                         key={note.id}
                         note={note}
                         onDelete={(id) => setDeleteNoteId(id)}
-                        onToggleItem={toggleChecklistItem}
+                        onToggleItem={handleToggleItem}
                         onEdit={handleEditNote}
                       />
                     ))
@@ -768,7 +807,7 @@ export function NotesSection() {
           </CardContent>
         </Card>
 
-        {/* Links */}
+        {/* Quick Links */}
         <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -784,12 +823,7 @@ export function NotesSection() {
                 open={linkDialogOpen}
                 onOpenChange={(open) => {
                   setLinkDialogOpen(open);
-                  if (!open) {
-                    setEditingLink(null);
-                    setNewLinkLabel("");
-                    setNewLinkUrl("");
-                    setNewLinkTags("");
-                  }
+                  if (!open) resetLinkDialog();
                 }}
               >
                 <DialogTrigger asChild>
@@ -844,7 +878,7 @@ export function NotesSection() {
                       >
                         Cancel
                       </Button>
-                      <Button onClick={addLink}>
+                      <Button onClick={handleSaveLink}>
                         {editingLink ? "Save Changes" : "Add Link"}
                       </Button>
                     </div>
@@ -889,7 +923,6 @@ export function NotesSection() {
         </Card>
       </div>
 
-      {/* Delete Note Confirmation */}
       <AlertDialog
         open={!!deleteNoteId}
         onOpenChange={(open) => !open && setDeleteNoteId(null)}
@@ -898,14 +931,14 @@ export function NotesSection() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Note</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{noteToDelete?.title}"? This
-              action cannot be undone.
+              Are you sure you want to delete &quot;{noteToDelete?.title}&quot;?
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDeleteNote}
+              onClick={handleConfirmDeleteNote}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
@@ -914,7 +947,6 @@ export function NotesSection() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Link Confirmation */}
       <AlertDialog
         open={!!deleteLinkId}
         onOpenChange={(open) => !open && setDeleteLinkId(null)}
@@ -923,14 +955,14 @@ export function NotesSection() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Link</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{linkToDelete?.label}"? This
-              action cannot be undone.
+              Are you sure you want to delete &quot;{linkToDelete?.label}&quot;?
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDeleteLink}
+              onClick={handleConfirmDeleteLink}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete

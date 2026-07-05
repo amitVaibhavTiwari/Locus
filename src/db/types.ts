@@ -250,6 +250,39 @@ export interface IssueCommentsTable {
   updated_at: string;
 }
 
+export interface NotesTable {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  type: "text" | "checklist";
+  title: string;
+  content: string | null;
+  rank: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NoteItemsTable {
+  id: string;
+  note_id: string;
+  text: string;
+  checked: number;
+  rank: number;
+  created_at: string;
+}
+
+export interface LinksTable {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  label: string;
+  url: string;
+  tags: string | null;
+  rank: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Database {
   users: UsersTable;
   accounts: AccountsTable;
@@ -273,4 +306,7 @@ export interface Database {
   activities: ActivitiesTable;
   attachments: AttachmentsTable;
   issue_comments: IssueCommentsTable;
+  notes: NotesTable;
+  note_items: NoteItemsTable;
+  links: LinksTable;
 }

@@ -10,7 +10,6 @@ import {
   Pin,
   ChevronDown,
   ChevronRight,
-  Send,
   Check,
   ChevronsUpDown,
 } from "lucide-react";
@@ -43,9 +42,6 @@ const getMainNavigation = (role: "owner" | "admin" | "member") => [
   { title: "Home", url: "/dashboard", icon: LayoutDashboard },
   { title: "Projects", url: "/projects", icon: Folder },
   { title: "Team", url: "/team", icon: Users },
-  ...(role === "owner"
-    ? [{ title: "Sent Invites", url: "/invites", icon: Send }]
-    : []),
 ];
 
 const settingsNavigation = [

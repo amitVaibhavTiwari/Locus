@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -248,58 +249,65 @@ export function TeamClient({
         </div>
 
         {canInvite && (
-          <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Invite Member
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Invite Team Member</DialogTitle>
-                <DialogDescription>
-                  Send an invitation to add a new member to your team.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newMemberEmail}
-                    onChange={(e) => setNewMemberEmail(e.target.value)}
-                    placeholder="Enter email address"
-                  />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/invites">See Pending Invites</Link>
+            </Button>
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Invite Member
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Invite Team Member</DialogTitle>
+                  <DialogDescription>
+                    Send an invitation to add a new member to your team.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={newMemberEmail}
+                      onChange={(e) => setNewMemberEmail(e.target.value)}
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Role *</Label>
+                    <Select
+                      value={newMemberRole}
+                      onValueChange={setNewMemberRole}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Admin">Admin</SelectItem>
+                        <SelectItem value="Member">Member</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setInviteDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleInviteMember}>
+                      Send Invitation
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Role *</Label>
-                  <Select
-                    value={newMemberRole}
-                    onValueChange={setNewMemberRole}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="Member">Member</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setInviteDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={handleInviteMember}>Send Invitation</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 

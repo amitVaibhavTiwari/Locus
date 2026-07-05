@@ -15,6 +15,14 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        {/* This below is done to manage theme in splash screen so don't remove it */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t){document.documentElement.classList.add(t);}else if(window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark');}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="h-full">
         <Providers>{children}</Providers>
       </body>

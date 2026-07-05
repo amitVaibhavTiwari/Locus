@@ -5,7 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Flag, Calendar, Search } from "lucide-react";
-import { NotesSection } from "@/components/dashboard/NotesSection";
+import {
+  NotesSection,
+  NoteData,
+  LinkData,
+} from "@/components/dashboard/NotesSection";
 import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 import { Task } from "@/components/kanban/KanbanBoard";
 import {
@@ -20,9 +24,16 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 interface DashboardOverviewProps {
   tasks: Task[];
   username: string;
+  initialNotes: NoteData[];
+  initialLinks: LinkData[];
 }
 
-export function DashboardOverview({ tasks, username }: DashboardOverviewProps) {
+export function DashboardOverview({
+  tasks,
+  username,
+  initialNotes,
+  initialLinks,
+}: DashboardOverviewProps) {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [reporterFilter, setReporterFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -391,7 +402,7 @@ export function DashboardOverview({ tasks, username }: DashboardOverviewProps) {
           </CardContent>
         </Card>
       </div>
-      <NotesSection />
+      <NotesSection initialNotes={initialNotes} initialLinks={initialLinks} />
     </div>
   );
 }

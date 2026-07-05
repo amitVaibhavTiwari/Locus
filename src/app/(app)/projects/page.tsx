@@ -1,12 +1,21 @@
 ﻿import { redirect } from "next/navigation";
-import { getSessionUser, getActiveOrg, getPinnedProjects } from "@/lib/dal";
+import {
+  getSessionUser,
+  getActiveOrg,
+  getPinnedProjects,
+  getCurrentUserOrgRole,
+} from "@/lib/dal";
 import { db } from "@/lib/db";
 import { ProjectsClient } from "./ProjectsClient";
 
 const PAGE_SIZE = 15;
 
 export default async function ProjectsPage() {
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
+  const [user, org, userRole] = await Promise.all([
+    getSessionUser(),
+    getActiveOrg(),
+    getCurrentUserOrgRole(),
+  ]);
   if (!org || !user) redirect("/onboarding/workspace");
 
   const projectsBaseQuery = db
@@ -56,6 +65,7 @@ export default async function ProjectsPage() {
       initialHasMore={hasMore}
       initialTotal={initialTotal}
       pinnedIds={pinnedIds}
+      userRole={userRole ?? "member"}
     />
   );
 }
