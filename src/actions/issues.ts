@@ -301,6 +301,7 @@ export async function updateIssue(
       "priority",
       "due_date",
       "epic_id",
+      "issue_number",
     ])
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
@@ -392,6 +393,29 @@ export async function updateIssue(
       })
       .execute();
   });
+
+  if (epicId && (issue.epic_id ?? null) !== epicId) {
+    after(async () => {
+      await db
+        .insertInto("activities")
+        .values({
+          id: randomUUID(),
+          organization_id: issue.organization_id,
+          project_id: issue.project_id,
+          issue_id: null,
+          epic_id: epicId,
+          user_id: session.user.id,
+          type: "task_added",
+          payload: JSON.stringify({
+            issue_id: issueId,
+            issue_number: issue.issue_number,
+            title: issue.title,
+          }),
+          created_at: new Date().toISOString(),
+        })
+        .execute();
+    });
+  }
 
   revalidatePath(`/project/${issue.project_id}`);
   return undefined;

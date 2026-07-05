@@ -1,3 +1,5 @@
+import type { ColumnType } from "kysely";
+
 export interface UsersTable {
   id: string;
   email: string;
@@ -221,6 +223,7 @@ export interface ActivitiesTable {
   organization_id: string;
   project_id: string;
   issue_id: string | null;
+  epic_id: ColumnType<string | null, string | null | undefined, string | null>;
   user_id: string;
   type: string;
   payload: string;

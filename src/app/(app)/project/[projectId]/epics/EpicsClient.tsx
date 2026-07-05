@@ -3,13 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Plus,
-  Search,
-  MoreHorizontal,
-  ChevronDown,
-  Loader2,
-} from "lucide-react";
+import { Plus, Search, ChevronDown, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -17,12 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
@@ -61,14 +49,6 @@ interface Filters {
   status: string;
   ownerId: string;
 }
-
-const PRIORITY_DOT: Record<string, string> = {
-  highest: "bg-destructive",
-  high: "bg-destructive",
-  medium: "bg-warning",
-  low: "bg-success",
-  none: "bg-muted-foreground",
-};
 
 function getInitials(name: string) {
   return name
@@ -409,8 +389,6 @@ export function EpicsClient({
               epic.totalIssues > 0
                 ? Math.round((epic.doneIssues / epic.totalIssues) * 100)
                 : 0;
-            const dotClass =
-              PRIORITY_DOT[epic.priority] ?? "bg-muted-foreground";
             return (
               <div
                 key={epic.id}
@@ -450,7 +428,6 @@ export function EpicsClient({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
                     <h3 className="text-base font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                       {epic.name}
                     </h3>
@@ -502,31 +479,6 @@ export function EpicsClient({
                     </div>
                   )}
                 </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    asChild
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/epics/${epic.id}`);
-                      }}
-                    >
-                      View Issues
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             );
           })}

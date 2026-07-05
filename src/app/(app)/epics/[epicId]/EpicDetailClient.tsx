@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Loader2, Pencil, Archive, ChevronDown } from "lucide-react";
+import {
+  Loader2,
+  Pencil,
+  Archive,
+  ChevronDown,
+  History,
+  CalendarDays,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 import { updateEpicStatus, updateEpic, archiveEpic } from "@/actions/epics";
@@ -70,6 +78,7 @@ interface Epic {
   description: string | null;
   priority: string;
   status: string;
+  start_date: string | null;
   end_date: string | null;
   totalIssues: number;
   doneIssues: number;
@@ -88,6 +97,15 @@ function getInitials(name: string) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+}
+
+function formatDate(d: string | null) {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -234,6 +252,7 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
   const [editOwnerLabel, setEditOwnerLabel] = useState(
     epic.owner?.username ?? "",
   );
+  const [editStartDate, setEditStartDate] = useState(epic.start_date ?? "");
   const [editEndDate, setEditEndDate] = useState(epic.end_date ?? "");
   const [editPending, setEditPending] = useState(false);
 
@@ -244,6 +263,7 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
     setEditStatus(epicStatus);
     setEditOwnerId(epic.owner?.id ?? "");
     setEditOwnerLabel(epic.owner?.username ?? "");
+    setEditStartDate(epic.start_date ?? "");
     setEditEndDate(epic.end_date ?? "");
     setEditOpen(true);
   };
@@ -265,6 +285,7 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
         priority: editPriority,
         status: editStatus,
         owner_id: editOwnerId || null,
+        start_date: editStartDate || null,
         end_date: editEndDate || null,
       });
       setEditPending(false);
@@ -385,6 +406,25 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
               {epic.doneIssues}/{epic.totalIssues} issues
             </span>
           </div>
+
+          <div className="flex items-center gap-4 flex-wrap">
+            {epic.start_date && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <CalendarDays className="w-4 h-4 shrink-0" />
+                <span className="font-medium text-foreground">
+                  Epic Start Date:
+                </span>
+                <span>{formatDate(epic.start_date)}</span>
+              </div>
+            )}
+            {epic.end_date && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <CalendarDays className="w-4 h-4 shrink-0" />
+                <span className="font-medium text-foreground">Deadline:</span>
+                <span>{formatDate(epic.end_date)}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -417,28 +457,36 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
             </div>
           </div>
 
-          {isManager && (
-            <div className="flex flex-col gap-2 ml-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={openEdit}
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-destructive border-destructive/40 hover:bg-destructive/10"
-                onClick={handleArchiveClick}
-              >
-                <Archive className="w-3.5 h-3.5" />
-                Archive
-              </Button>
-            </div>
-          )}
+          <div className="flex flex-col gap-2 ml-2">
+            <Button variant="outline" size="sm" className="gap-2" asChild>
+              <Link href={`/epics/${epic.id}/history`}>
+                <History className="w-3.5 h-3.5" />
+                History
+              </Link>
+            </Button>
+            {isManager && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={openEdit}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-destructive border-destructive/40 hover:bg-destructive/10"
+                  onClick={handleArchiveClick}
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  Archive
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -568,13 +616,25 @@ export function EpicDetailClient({ epic, issues }: EpicDetailClientProps) {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>End Date</Label>
-              <Input
-                type="date"
-                value={editEndDate}
-                onChange={(e) => setEditEndDate(e.target.value)}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              {editStatus === "planned" && (
+                <div className="space-y-1.5">
+                  <Label>Epic Start Date</Label>
+                  <Input
+                    type="date"
+                    value={editStartDate}
+                    onChange={(e) => setEditStartDate(e.target.value)}
+                  />
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label>Deadline</Label>
+                <Input
+                  type="date"
+                  value={editEndDate}
+                  onChange={(e) => setEditEndDate(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 

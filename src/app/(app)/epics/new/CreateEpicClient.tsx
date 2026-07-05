@@ -23,14 +23,9 @@ interface Member {
   avatar_url: string | null;
 }
 
-interface Project {
-  id: string;
-  name: string;
-}
-
 interface CreateEpicClientProps {
-  projects: Project[];
-  defaultProjectId: string | null;
+  projectId: string;
+  projectName: string;
   members: Member[];
   currentUserId: string;
 }
@@ -45,18 +40,14 @@ function getInitials(name: string) {
 }
 
 export function CreateEpicClient({
-  projects,
-  defaultProjectId,
+  projectId,
+  projectName,
   members,
   currentUserId,
 }: CreateEpicClientProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-
-  const [projectId, setProjectId] = useState(
-    defaultProjectId ?? projects[0]?.id ?? "",
-  );
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
@@ -72,14 +63,6 @@ export function CreateEpicClient({
       toast({
         title: "Error",
         description: "Epic name is required",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!projectId) {
-      toast({
-        title: "Error",
-        description: "Select a project",
         variant: "destructive",
       });
       return;
@@ -116,11 +99,7 @@ export function CreateEpicClient({
         <div className="mb-8 pl-2">
           <Button
             variant="ghost"
-            onClick={() =>
-              router.push(
-                projectId ? `/project/${projectId}/epics` : "/projects",
-              )
-            }
+            onClick={() => router.push(`/project/${projectId}/epics`)}
             className="mb-4 hover:bg-transparent text-muted-foreground hover:text-foreground -ml-3"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -135,23 +114,12 @@ export function CreateEpicClient({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6 pl-2 ">
-          {projects.length > 1 && (
-            <div className="space-y-2">
-              <Label>Project *</Label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label>Project</Label>
+            <p className="text-sm font-medium px-3 py-2 bg-muted/50 rounded-md border border-border text-foreground">
+              {projectName}
+            </p>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="name">Epic Name *</Label>
@@ -253,11 +221,7 @@ export function CreateEpicClient({
             <Button
               type="button"
               variant="outline"
-              onClick={() =>
-                router.push(
-                  projectId ? `/epics?projectId=${projectId}` : "/epics",
-                )
-              }
+              onClick={() => router.push(`/project/${projectId}/epics`)}
               disabled={isPending}
             >
               Cancel

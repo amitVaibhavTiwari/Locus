@@ -23,11 +23,15 @@ export default async function NewEpicPage({
   ]);
 
   const resolvedProjectId = projectId ?? projects[0]?.id ?? null;
+  if (!resolvedProjectId) redirect("/projects");
+
+  const project = projects.find((p) => p.id === resolvedProjectId);
+  if (!project) redirect("/projects");
 
   return (
     <CreateEpicClient
-      projects={projects.map((p) => ({ id: p.id, name: p.name }))}
-      defaultProjectId={resolvedProjectId}
+      projectId={resolvedProjectId}
+      projectName={project.name}
       members={orgMembers.map((m) => ({
         id: m.id,
         username: m.username,
