@@ -29,12 +29,17 @@ export default async function SprintDetailPage({
   const sprint = allSprints.find((s) => s.id === sprintId);
   if (!sprint) notFound();
 
+  const hasActiveSprint = allSprints.some(
+    (s) => s.id !== sprintId && s.status === "active",
+  );
+
   return (
     <SprintDetailClient
       projectId={projectId}
       projectName={project.name}
       sprint={sprint}
       issues={issues}
+      hasActiveSprint={hasActiveSprint}
     />
   );
 }

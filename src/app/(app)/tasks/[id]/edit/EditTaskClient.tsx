@@ -298,6 +298,13 @@ export function EditTaskClient({
     id: string;
     filename: string;
   } | null>(null);
+  const [selectedSprintId, setSelectedSprintId] = useState<string>(
+    issue.sprintId ?? "__none__",
+  );
+  const [midSprintWarning, setMidSprintWarning] = useState<
+    "add" | "remove" | null
+  >(null);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
   const [epicOpen, setEpicOpen] = useState(false);
   const [epicResults, setEpicResults] = useState<
     { id: string; name: string }[]
@@ -316,18 +323,7 @@ export function EditTaskClient({
       .finally(() => setAttachmentsLoading(false));
   }, [issue.id]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!taskTitle.trim()) {
-      toast({
-        title: "Error",
-        description: "Task title is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const doSubmit = () => {
     const pendingLabel = customLabel.trim();
     const finalLabels =
       pendingLabel && !labels.includes(pendingLabel)
@@ -346,6 +342,7 @@ export function EditTaskClient({
       formData.set("priority", priority || "medium");
       formData.set("labels", JSON.stringify(finalLabels));
       formData.set("edit_permission", editPermission);
+      formData.set("sprint_id", selectedSprintId);
       if (assignee) formData.set("assignee_id", assignee.id);
       if (dueDate) formData.set("due_date", format(dueDate, "yyyy-MM-dd"));
       if (epic) formData.set("epic_id", epic.id);
@@ -383,6 +380,40 @@ export function EditTaskClient({
       toast({ title: "Task updated" });
       router.push(`/project/${projectId}`);
     });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!taskTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Task title is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const oldSprintId = issue.sprintId ?? "__none__";
+    const newSprintId = selectedSprintId;
+    const sprintChanged = oldSprintId !== newSprintId;
+
+    if (sprintChanged) {
+      const newSprint = sprints.find((s) => s.id === newSprintId);
+      const oldSprint = sprints.find((s) => s.id === oldSprintId);
+      if (newSprint?.status === "active") {
+        setMidSprintWarning("add");
+        setPendingSubmit(true);
+        return;
+      }
+      if (oldSprint?.status === "active") {
+        setMidSprintWarning("remove");
+        setPendingSubmit(true);
+        return;
+      }
+    }
+
+    doSubmit();
   };
 
   const handleEpicSearch = (q: string) => {
@@ -525,22 +556,23 @@ export function EditTaskClient({
             </div>
 
             <div className="space-y-2">
-              <Label>Who can edit</Label>
-              <Select
-                value={editPermission}
-                onValueChange={(v) =>
-                  setEditPermission(v as typeof editPermission)
-                }
+              <Label className="flex items-center gap-2">
+                Who can edit
+                <span className="text-xs font-normal text-muted-foreground">
+                  (cannot be changed)
+                </span>
+              </Label>
+              <Button
+                variant="outline"
+                className="w-full justify-start opacity-60 cursor-not-allowed"
+                disabled
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anyone">Anyone in project</SelectItem>
-                  <SelectItem value="assignee_only">Assignee only</SelectItem>
-                  <SelectItem value="reporter_only">Reporter only</SelectItem>
-                </SelectContent>
-              </Select>
+                {editPermission === "anyone"
+                  ? "Anyone in project"
+                  : editPermission === "assignee_only"
+                    ? "Assignee only"
+                    : "Reporter only"}
+              </Button>
             </div>
           </div>
 
@@ -668,6 +700,31 @@ export function EditTaskClient({
                 </PopoverContent>
               </Popover>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Sprint</Label>
+            <Select
+              value={selectedSprintId}
+              onValueChange={setSelectedSprintId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No sprint" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No sprint</SelectItem>
+                {sprints.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                    {s.status === "active" && (
+                      <span className="ml-2 text-xs text-primary">
+                        (active)
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-3">
@@ -837,6 +894,50 @@ export function EditTaskClient({
           </div>
         </form>
       </div>
+
+      <AlertDialog
+        open={!!midSprintWarning}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMidSprintWarning(null);
+            setPendingSubmit(false);
+          }
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {midSprintWarning === "add"
+                ? "Adding task to active sprint"
+                : "Removing task from active sprint"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {midSprintWarning === "add"
+                ? "Adding a task mid-sprint will affect the sprint scope and may impact velocity tracking."
+                : "Removing a task from an ongoing sprint will affect the sprint scope and may impact velocity tracking."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setMidSprintWarning(null);
+                setPendingSubmit(false);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setMidSprintWarning(null);
+                setPendingSubmit(false);
+                doSubmit();
+              }}
+            >
+              Proceed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!confirmDeleteAttachment}

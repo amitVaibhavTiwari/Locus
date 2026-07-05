@@ -79,7 +79,9 @@ export function ProjectBoardClient({
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [subGroupBy, setSubGroupBy] = useState<SubGroupBy>("none");
 
-  const [sprintFilter, setSprintFilter] = useState("current");
+  const [sprintFilter, setSprintFilter] = useState(
+    activeSprintId ? "current" : "all",
+  );
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [reporterFilter, setReporterFilter] = useState("all");
@@ -465,7 +467,9 @@ export function ProjectBoardClient({
                 <SelectValue placeholder="Sprint" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="current">Current Sprint</SelectItem>
+                <SelectItem value="current" disabled={!activeSprintId}>
+                  Current Sprint
+                </SelectItem>
                 <SelectItem value="all">All Tasks</SelectItem>
               </SelectContent>
             </Select>

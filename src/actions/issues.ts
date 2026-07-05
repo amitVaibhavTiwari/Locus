@@ -279,6 +279,8 @@ export async function updateIssue(
   const assigneeId = formData.get("assignee_id")?.toString() || null;
   const dueDate = formData.get("due_date")?.toString() || null;
   const epicId = formData.get("epic_id")?.toString() || null;
+  const sprintIdRaw = formData.get("sprint_id")?.toString();
+  const sprintId = sprintIdRaw && sprintIdRaw !== "__none__" ? sprintIdRaw : null;
   const editPermission = formData.get("edit_permission")?.toString() as
     | "anyone"
     | "assignee_only"
@@ -301,6 +303,7 @@ export async function updateIssue(
       "priority",
       "due_date",
       "epic_id",
+      "sprint_id",
       "issue_number",
     ])
     .executeTakeFirst();
@@ -335,6 +338,8 @@ export async function updateIssue(
     changes.push({ field: "due_date", from: issue.due_date, to: dueDate });
   if ((issue.epic_id ?? null) !== (epicId ?? null))
     changes.push({ field: "epic", from: issue.epic_id, to: epicId });
+  if ((issue.sprint_id ?? null) !== (sprintId ?? null))
+    changes.push({ field: "sprint", from: issue.sprint_id, to: sprintId });
   if (editPermission && issue.edit_permission !== editPermission)
     changes.push({
       field: "edit_permission",
@@ -352,6 +357,7 @@ export async function updateIssue(
       assignee_id: assigneeId || null,
       due_date: dueDate,
       epic_id: epicId || null,
+      sprint_id: sprintId,
       ...(editPermission ? { edit_permission: editPermission } : {}),
       updated_at: now,
     })
@@ -415,6 +421,65 @@ export async function updateIssue(
         })
         .execute();
     });
+  }
+
+  if ((issue.sprint_id ?? null) !== (sprintId ?? null)) {
+    if (sprintId) {
+      after(async () => {
+        const sprint = await db
+          .selectFrom("sprints")
+          .where("id", "=", sprintId)
+          .select(["status"])
+          .executeTakeFirst();
+        if (sprint?.status === "active") {
+          await db
+            .insertInto("activities")
+            .values({
+              id: randomUUID(),
+              organization_id: issue.organization_id,
+              project_id: issue.project_id,
+              issue_id: issueId,
+              sprint_id: sprintId,
+              user_id: session.user.id,
+              type: "task_added_mid_sprint",
+              payload: JSON.stringify({
+                issue_number: issue.issue_number,
+                title: issue.title,
+              }),
+              created_at: new Date().toISOString(),
+            })
+            .execute();
+        }
+      });
+    }
+    if (issue.sprint_id) {
+      after(async () => {
+        const oldSprint = await db
+          .selectFrom("sprints")
+          .where("id", "=", issue.sprint_id!)
+          .select(["status"])
+          .executeTakeFirst();
+        if (oldSprint?.status === "active") {
+          await db
+            .insertInto("activities")
+            .values({
+              id: randomUUID(),
+              organization_id: issue.organization_id,
+              project_id: issue.project_id,
+              issue_id: issueId,
+              sprint_id: issue.sprint_id!,
+              user_id: session.user.id,
+              type: "task_removed_mid_sprint",
+              payload: JSON.stringify({
+                issue_number: issue.issue_number,
+                title: issue.title,
+              }),
+              created_at: new Date().toISOString(),
+            })
+            .execute();
+        }
+      });
+    }
   }
 
   revalidatePath(`/project/${issue.project_id}`);

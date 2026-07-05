@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -27,6 +28,8 @@ import {
   TrendingUp,
   TrendingDown,
   Search,
+  History,
+  Pencil,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -52,7 +55,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { startSprint, completeSprint } from "@/actions/sprints";
+import { startSprint, completeSprint, updateSprint } from "@/actions/sprints";
 import { formatDate, daysUntil, daysSince, daysBetween } from "@/lib/date";
 
 interface Issue {
@@ -85,6 +88,7 @@ interface SprintDetailClientProps {
   projectName: string;
   sprint: Sprint;
   issues: Issue[];
+  hasActiveSprint: boolean;
 }
 
 function getInitials(name: string) {
@@ -145,6 +149,7 @@ export function SprintDetailClient({
   projectName,
   sprint,
   issues,
+  hasActiveSprint,
 }: SprintDetailClientProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -156,6 +161,14 @@ export function SprintDetailClient({
   const [teamSearch, setTeamSearch] = useState("");
   const [endSprintOpen, setEndSprintOpen] = useState(false);
   const [moveTarget, setMoveTarget] = useState<string>("backlog");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState(sprint.name);
+  const [editGoal, setEditGoal] = useState(sprint.goal ?? "");
+  const [editStartDate, setEditStartDate] = useState(sprint.start_date ?? "");
+  const [editEndDate, setEditEndDate] = useState(sprint.end_date ?? "");
+  const [endDateWarningOpen, setEndDateWarningOpen] = useState(false);
+  const [startConfirmOpen, setStartConfirmOpen] = useState(false);
+  const [startBlockOpen, setStartBlockOpen] = useState(false);
   const [futureSprints, setFutureSprints] = useState<
     {
       id: string;
@@ -174,10 +187,10 @@ export function SprintDetailClient({
       : 0;
 
   const days = daysUntil(sprint.end_date);
-  const spanDays = daysBetween(sprint.start_date, sprint.end_date); // e.g. 3 for Jul3–Jul6
-  const total = spanDays !== null ? spanDays + 1 : null; // inclusive: 4
-  const sinceStart = daysSince(sprint.start_date); // 0 on day 1, 1 on day 2…
-  const elapsed = sinceStart !== null ? sinceStart + 1 : null; // current day number (1-based)
+  const spanDays = daysBetween(sprint.start_date, sprint.end_date);
+  const total = spanDays !== null ? spanDays + 1 : null;
+  const sinceStart = daysSince(sprint.start_date);
+  const elapsed = sinceStart !== null ? sinceStart + 1 : null;
   const timePct =
     spanDays && sinceStart !== null
       ? Math.min(100, Math.round((sinceStart / spanDays) * 100))
@@ -269,9 +282,49 @@ export function SprintDetailClient({
     });
   };
 
+  const doEditSprint = () => {
+    startTransition(async () => {
+      const data =
+        sprint.status === "active"
+          ? {
+              name: editName.trim() || sprint.name,
+              goal: editGoal.trim() || null,
+              end_date: editEndDate || null,
+            }
+          : {
+              name: editName.trim() || sprint.name,
+              goal: editGoal.trim() || null,
+              start_date: editStartDate || null,
+              end_date: editEndDate || null,
+            };
+      const result = await updateSprint(sprint.id, data);
+      if (result?.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Sprint updated" });
+      setEditOpen(false);
+      router.refresh();
+    });
+  };
+
+  const handleEditSprint = () => {
+    if (
+      sprint.status === "active" &&
+      (editEndDate || null) !== (sprint.end_date ?? null)
+    ) {
+      setEndDateWarningOpen(true);
+      return;
+    }
+    doEditSprint();
+  };
+
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button
@@ -300,32 +353,42 @@ export function SprintDetailClient({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/project/${projectId}/sprints/${sprint.id}/history`}>
+              <History className="w-4 h-4 mr-2" />
+              History
+            </Link>
+          </Button>
+          {sprint.status !== "completed" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditName(sprint.name);
+                setEditGoal(sprint.goal ?? "");
+                setEditStartDate(sprint.start_date ?? "");
+                setEditEndDate(sprint.end_date ?? "");
+                setEditOpen(true);
+              }}
+              disabled={isPending}
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+          )}
           {sprint.status === "planned" && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  className="bg-success hover:bg-success/90 text-success-foreground"
-                  disabled={isPending}
-                >
-                  Start Sprint
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Start Sprint?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will start the sprint immediately. Make sure all tasks
-                    are assigned and ready.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleStartSprint}>
-                    Start Sprint
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              disabled={isPending}
+              onClick={() => {
+                if (hasActiveSprint) {
+                  setStartBlockOpen(true);
+                } else {
+                  setStartConfirmOpen(true);
+                }
+              }}
+            >
+              Start Sprint
+            </Button>
           )}
           {sprint.status === "active" && (
             <Button
@@ -340,7 +403,130 @@ export function SprintDetailClient({
         </div>
       </div>
 
-      {/* End Sprint Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Sprint</DialogTitle>
+            <DialogDescription>
+              {sprint.status === "active"
+                ? "Start date cannot be changed for an active sprint."
+                : "Update sprint details."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label>Sprint Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Sprint name"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Input
+                value={editGoal}
+                onChange={(e) => setEditGoal(e.target.value)}
+                placeholder="Sprint goal (optional)"
+              />
+            </div>
+            {sprint.status === "planned" && (
+              <div className="space-y-1.5">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                value={editEndDate}
+                onChange={(e) => setEditEndDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleEditSprint} disabled={isPending}>
+              {isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={endDateWarningOpen}
+        onOpenChange={setEndDateWarningOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change sprint end date?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Changing the end date of an ongoing sprint will affect its scope
+              and may impact velocity and deadline tracking.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEndDateWarningOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setEndDateWarningOpen(false);
+                doEditSprint();
+              }}
+            >
+              Proceed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={startConfirmOpen} onOpenChange={setStartConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start Sprint?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will start the sprint immediately. Make sure all tasks are
+              assigned and ready.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleStartSprint}>
+              Start Sprint
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={startBlockOpen} onOpenChange={setStartBlockOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sprint already active</AlertDialogTitle>
+            <AlertDialogDescription>
+              Another sprint is already active in this project. Complete it
+              before starting a new one.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setStartBlockOpen(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={endSprintOpen} onOpenChange={setEndSprintOpen}>
         <DialogContent>
           <DialogHeader>
@@ -560,7 +746,6 @@ export function SprintDetailClient({
         </div>
       )}
 
-      {/* Team Progress */}
       {teamMembers.length > 0 && (
         <Card className="bg-card border border-border mb-6">
           <CardHeader className="pb-3">
@@ -643,7 +828,6 @@ export function SprintDetailClient({
         </Card>
       )}
 
-      {/* Issues List */}
       <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-4">

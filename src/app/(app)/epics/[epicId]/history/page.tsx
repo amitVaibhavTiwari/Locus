@@ -29,7 +29,7 @@ export default async function EpicHistoryPage({
       "users.username",
       "users.avatar_url",
     ])
-    .orderBy("activities.created_at", "asc")
+    .orderBy("activities.created_at", "desc")
     .execute();
 
   return (

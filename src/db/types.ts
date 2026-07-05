@@ -224,6 +224,11 @@ export interface ActivitiesTable {
   project_id: string;
   issue_id: string | null;
   epic_id: ColumnType<string | null, string | null | undefined, string | null>;
+  sprint_id: ColumnType<
+    string | null,
+    string | null | undefined,
+    string | null
+  >;
   user_id: string;
   type: string;
   payload: string;

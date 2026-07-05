@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Locus Kanban",
   description: "Open source project management.",
   icons: {
-    icon: "/locus_logo.png",
+    icon: "/locus.png",
   },
 };
 

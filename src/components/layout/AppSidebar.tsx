@@ -123,24 +123,16 @@ export function AppSidebar({
           {workspaces.length > 1 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 w-full rounded-lg hover:bg-secondary transition-colors p-1 -m-1 group">
-                  <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/locus_logo.png"
-                      alt="Locus"
-                      width={32}
-                      height={32}
-                      className="rounded-lg"
-                    />
-                  </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <h1 className="font-bold text-sm text-foreground truncate">
+                <button className="flex items-center justify-between w-full rounded-md hover:bg-secondary transition-colors px-2 py-1.5 -mx-2 group">
+                  <div className="text-left min-w-0">
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 font-medium mb-0.5">
+                      Workspace
+                    </p>
+                    <p className="font-bold text-base text-foreground truncate leading-tight">
                       {workspaceName}
-                    </h1>
-                    <p className="text-xs text-muted-foreground">Workspace</p>
+                    </p>
                   </div>
-                  <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0 opacity-60 group-hover:opacity-100" />
+                  <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0 opacity-40 group-hover:opacity-100 transition-opacity ml-2" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="bottom" align="start" className="w-56">
@@ -157,16 +149,6 @@ export function AppSidebar({
                       startTransition(() => switchWorkspace(ws.id));
                     }}
                   >
-                    <div className="w-5 h-5 flex items-center justify-center shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/locus_logo.png"
-                        alt="Locus"
-                        width={20}
-                        height={20}
-                        className="rounded"
-                      />
-                    </div>
                     <span className="flex-1 truncate">{ws.name}</span>
                     {ws.id === activeOrgId && (
                       <Check className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -176,23 +158,13 @@ export function AppSidebar({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 flex items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/locus_logo.png"
-                  alt="Locus"
-                  width={32}
-                  height={32}
-                  className="rounded-lg"
-                />
-              </div>
-              <div>
-                <h1 className="font-bold text-base text-foreground">
-                  {workspaceName}
-                </h1>
-                <p className="text-xs text-muted-foreground">Workspace</p>
-              </div>
+            <div className="px-2 py-1.5 -mx-2">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 font-medium mb-0.5">
+                Workspace
+              </p>
+              <p className="font-bold text-base text-foreground truncate leading-tight">
+                {workspaceName}
+              </p>
             </div>
           )}
         </div>
