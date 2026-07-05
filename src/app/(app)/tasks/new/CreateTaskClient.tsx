@@ -44,6 +44,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { createIssue } from "@/actions/issues";
+import { StoryPointPicker } from "@/components/ui/story-point-picker";
 
 interface BoardStatus {
   key: string;
@@ -240,6 +241,7 @@ export function CreateTaskClient({
   const [sprintId, setSprintId] = useState<string | null>(
     sprints.find((s) => s.status === "active")?.id ?? null,
   );
+  const [storyPoints, setStoryPoints] = useState<number | null>(null);
   const [editPermission, setEditPermission] = useState<
     "anyone" | "assignee_only" | "reporter_only"
   >("anyone");
@@ -298,6 +300,8 @@ export function CreateTaskClient({
       if (epic) formData.set("epic_id", epic.id);
       if (sprintId) formData.set("sprint_id", sprintId);
       formData.set("edit_permission", editPermission);
+      if (storyPoints !== null)
+        formData.set("story_points", storyPoints.toString());
 
       const result = await createIssue(undefined, formData);
       if (result?.error) {
@@ -510,6 +514,11 @@ export function CreateTaskClient({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Story Points</Label>
+            <StoryPointPicker value={storyPoints} onChange={setStoryPoints} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

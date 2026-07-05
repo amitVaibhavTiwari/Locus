@@ -30,6 +30,7 @@ type IssueRow = {
   reporter_id: string | null;
   due_date: string | null;
   created_at: string;
+  story_points: number | null;
 };
 
 async function enrichIssues(issues: IssueRow[]) {
@@ -105,6 +106,7 @@ async function enrichIssues(issues: IssueRow[]) {
       reporterId: issue.reporter_id,
       dueDate: issue.due_date ?? undefined,
       createdAt: issue.created_at,
+      storyPoints: issue.story_points ?? null,
       labels: labelMap.get(issue.id) ?? [],
       assignee: assignee
         ? {
@@ -181,6 +183,7 @@ export async function GET(
     "issues.reporter_id",
     "issues.due_date",
     "issues.created_at",
+    "issues.story_points",
   ] as const;
 
   const base = db

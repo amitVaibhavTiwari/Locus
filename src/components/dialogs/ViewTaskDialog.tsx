@@ -29,6 +29,7 @@ import {
   Calendar,
   Edit,
   Flag,
+  Hash,
   User,
   FileText,
   MessageSquare,
@@ -76,6 +77,7 @@ interface TaskData {
   epic_name: string | null;
   parentTask: { id: string; title: string } | null;
   boardStatuses: Array<{ key: string; name: string }>;
+  story_points: number | null;
 }
 
 interface Activity {
@@ -565,6 +567,20 @@ export function ViewTaskDialog({
                       <span className="text-sm">
                         {formattedCreatedAt ?? (
                           <span className="text-muted-foreground">Unknown</span>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 text-muted-foreground text-sm flex items-center gap-2">
+                        <Hash className="w-4 h-4" />
+                        Points:
+                      </div>
+                      <span className="text-sm">
+                        {taskData?.story_points != null ? (
+                          <span className="font-medium">{taskData.story_points} SP</span>
+                        ) : (
+                          <span className="text-muted-foreground">Not estimated</span>
                         )}
                       </span>
                     </div>

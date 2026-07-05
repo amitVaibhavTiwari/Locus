@@ -69,21 +69,21 @@ export function TaskCard({ task, isDragging = false }: TaskCardProps) {
 
             {task.labels && task.labels.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2">
-                {task.labels.slice(0, 2).map((label, index) => (
+                {task.labels.slice(0, 3).map((label, index) => (
                   <Badge
                     key={index}
                     variant="secondary"
-                    className="text-xs px-2 py-0.5"
+                    className="text-[11px] px-1.5 py-0 leading-4"
                   >
                     {label}
                   </Badge>
                 ))}
-                {task.labels.length > 2 && (
+                {task.labels.length > 3 && (
                   <Badge
                     variant="outline"
-                    className="text-xs px-2 py-0.5 text-muted-foreground"
+                    className="text-[11px] px-1.5 py-0 leading-4 text-muted-foreground"
                   >
-                    +{task.labels.length - 2}
+                    +{task.labels.length - 3}
                   </Badge>
                 )}
               </div>
@@ -119,6 +119,12 @@ export function TaskCard({ task, isDragging = false }: TaskCardProps) {
                     {task.priority}
                   </span>
                 </div>
+
+                {task.storyPoints != null && (
+                  <Badge className="text-xs px-1.5 py-0 font-semibold bg-primary/15 text-primary border-primary/20 hover:bg-primary/15">
+                    {task.storyPoints} SP
+                  </Badge>
+                )}
               </div>
 
               {task.assignee && (

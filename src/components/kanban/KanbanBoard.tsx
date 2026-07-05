@@ -46,6 +46,7 @@ export interface Task {
   epicName?: string | null;
   type?: "task" | "story" | "bug" | "subtask";
   createdAt?: string;
+  storyPoints?: number | null;
 }
 
 const DEFAULT_COLUMNS = [

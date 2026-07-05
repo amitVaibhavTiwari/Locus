@@ -33,6 +33,7 @@ export async function GET(
       "issues.organization_id",
       "issues.project_id",
       "issues.edit_permission",
+      "issues.story_points",
     ])
     .executeTakeFirst();
 
@@ -137,6 +138,7 @@ export async function GET(
     parentTask: parentIssue
       ? { id: parentIssue.id, title: parentIssue.title }
       : null,
+    story_points: issue.story_points ?? null,
     boardStatuses: boardStatuses.map((c) => ({
       key: c.key ?? c.name.toLowerCase().replace(/\s+/g, "-"),
       name: c.name,

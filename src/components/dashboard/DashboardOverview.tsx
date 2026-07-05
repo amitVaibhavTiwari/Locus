@@ -226,6 +226,11 @@ export function DashboardOverview({
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        {task.storyPoints != null && (
+                          <Badge variant="secondary" className="text-xs font-semibold">
+                            {task.storyPoints} SP
+                          </Badge>
+                        )}
                         <Badge
                           variant="outline"
                           className={`text-xs ${getPriorityColor(task.priority)}`}

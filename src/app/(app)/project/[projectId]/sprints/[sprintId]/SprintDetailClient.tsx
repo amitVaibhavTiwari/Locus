@@ -75,6 +75,7 @@ interface Issue {
   reporter: { id: string; username: string; avatar_url: string | null } | null;
   labels: string[];
   epic_name: string | null;
+  story_points: number | null;
 }
 
 interface Sprint {
@@ -198,6 +199,11 @@ export function SprintDetailClient({
 
   const completedIssues = issues.filter((i) => i.completed_at !== null);
   const incompleteIssues = issues.filter((i) => i.completed_at === null);
+  const totalSP = issues.reduce((acc, i) => acc + (i.story_points ?? 0), 0);
+  const completedSP = completedIssues.reduce(
+    (acc, i) => acc + (i.story_points ?? 0),
+    0,
+  );
   const completionPct =
     issues.length > 0
       ? Math.round((completedIssues.length / issues.length) * 100)
@@ -741,6 +747,22 @@ export function SprintDetailClient({
                 icon: Minus,
                 color: "muted-foreground",
               },
+              ...(totalSP > 0
+                ? [
+                    {
+                      label: "Total SP",
+                      value: totalSP,
+                      icon: TrendingUp,
+                      color: "primary",
+                    },
+                    {
+                      label: "SP Done",
+                      value: completedSP,
+                      icon: TrendingDown,
+                      color: "success",
+                    },
+                  ]
+                : []),
             ].map(({ label, value, icon: Icon, color }) => (
               <div
                 key={label}
@@ -947,6 +969,14 @@ export function SprintDetailClient({
                           )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          {issue.story_points != null && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs font-semibold"
+                            >
+                              {issue.story_points} SP
+                            </Badge>
+                          )}
                           <Badge
                             variant="outline"
                             className={`text-xs ${getPriorityColor(issue.priority)}`}

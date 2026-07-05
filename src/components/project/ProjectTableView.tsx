@@ -156,6 +156,9 @@ export function ProjectTableView({
                 <TableHead className="font-semibold text-foreground min-w-37.5 h-12">
                   Epic
                 </TableHead>
+                <TableHead className="font-semibold text-foreground min-w-20 h-12">
+                  SP
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -285,6 +288,16 @@ export function ProjectTableView({
                           </span>
                         )}
                       </TableCell>
+
+                      <TableCell className="h-14 py-0">
+                        {task.storyPoints != null ? (
+                          <Badge variant="secondary" className="text-xs font-semibold">
+                            {task.storyPoints} SP
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">&mdash;</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   }
                 />
@@ -322,6 +335,9 @@ export function ProjectTableView({
                     </TableCell>
                     <TableCell className="h-14 py-0">
                       <Skeleton className="h-5 w-16 rounded-full" />
+                    </TableCell>
+                    <TableCell className="h-14 py-0">
+                      <Skeleton className="h-5 w-10 rounded-full" />
                     </TableCell>
                   </TableRow>
                 ))}

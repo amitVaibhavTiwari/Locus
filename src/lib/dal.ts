@@ -231,6 +231,7 @@ export const getSprintIssues = cache(async (sprintId: string) => {
       "due_date",
       "created_at",
       "completed_at",
+      "story_points",
     ])
     .orderBy("issue_number", "asc")
     .execute();
@@ -718,12 +719,8 @@ export const getMyAssignedIssues = cache(
       .where("issues.parent_issue_id", "is", null)
       .where("issues.completed_at", "is", null)
       .where("issues.archived", "=", 0)
-      .$if(!!search, (qb) =>
-        qb.where("issues.title", "like", `%${search}%`),
-      )
-      .$if(!!project, (qb) =>
-        qb.where("projects.name", "=", project!),
-      )
+      .$if(!!search, (qb) => qb.where("issues.title", "like", `%${search}%`))
+      .$if(!!project, (qb) => qb.where("projects.name", "=", project!))
       .select([
         "issues.id",
         "issues.issue_number",
@@ -735,6 +732,7 @@ export const getMyAssignedIssues = cache(
         "issues.reporter_id",
         "issues.due_date",
         "issues.created_at",
+        "issues.story_points",
         "projects.name as project_name",
       ])
       .orderBy("issues.due_date", sort === "deadline-desc" ? "desc" : "asc")
@@ -790,6 +788,7 @@ export const getMyAssignedIssues = cache(
       dueDate: issue.due_date ?? undefined,
       issueNumber: issue.issue_number,
       createdAt: issue.created_at,
+      storyPoints: issue.story_points ?? null,
       reporter: issue.reporter_id
         ? (() => {
             const r = reporterMap.get(issue.reporter_id!);

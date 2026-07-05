@@ -52,6 +52,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { updateIssue } from "@/actions/issues";
+import { StoryPointPicker } from "@/components/ui/story-point-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,6 +102,7 @@ interface IssueData {
   dueDate: string | null;
   editPermission: "anyone" | "assignee_only" | "reporter_only";
   sprintId: string | null;
+  storyPoints: number | null;
   labels: string[];
   epic: { id: string; name: string } | null;
   assignee: Member | null;
@@ -286,6 +288,9 @@ export function EditTaskClient({
   const [epic, setEpic] = useState<{ id: string; name: string } | null>(
     issue.epic,
   );
+  const [storyPoints, setStoryPoints] = useState<number | null>(
+    issue.storyPoints,
+  );
   const [editPermission, setEditPermission] = useState<
     "anyone" | "assignee_only" | "reporter_only"
   >(issue.editPermission);
@@ -342,6 +347,8 @@ export function EditTaskClient({
       formData.set("priority", priority || "medium");
       formData.set("labels", JSON.stringify(finalLabels));
       formData.set("edit_permission", editPermission);
+      if (storyPoints !== null)
+        formData.set("story_points", storyPoints.toString());
       formData.set("sprint_id", selectedSprintId);
       if (assignee) formData.set("assignee_id", assignee.id);
       if (dueDate) formData.set("due_date", format(dueDate, "yyyy-MM-dd"));
@@ -536,6 +543,11 @@ export function EditTaskClient({
               placeholder="Describe the task in detail..."
               projectId={projectId}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Story Points</Label>
+            <StoryPointPicker value={storyPoints} onChange={setStoryPoints} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

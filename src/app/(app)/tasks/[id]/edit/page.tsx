@@ -29,6 +29,7 @@ export default async function EditTaskPage({
       "project_id",
       "board_id",
       "edit_permission",
+      "story_points",
     ])
     .executeTakeFirst();
 
@@ -47,59 +48,67 @@ export default async function EditTaskPage({
     redirect(`/project/${issue.project_id}`);
   }
 
-  const [project, reporter, assignee, labelRows, epic, members, statuses, sprints] =
-    await Promise.all([
-      db
-        .selectFrom("projects")
-        .where("id", "=", issue.project_id)
-        .select(["name"])
-        .executeTakeFirst(),
-      db
-        .selectFrom("users")
-        .where("id", "=", issue.reporter_id)
-        .select(["id", "username", "email", "avatar_url"])
-        .executeTakeFirst(),
-      issue.assignee_id
-        ? db
-            .selectFrom("users")
-            .where("id", "=", issue.assignee_id)
-            .select(["id", "username", "email", "avatar_url"])
-            .executeTakeFirst()
-        : Promise.resolve(null),
-      db
-        .selectFrom("issue_labels")
-        .innerJoin("labels", "labels.id", "issue_labels.label_id")
-        .where("issue_labels.issue_id", "=", issueId)
-        .select(["labels.name"])
-        .execute(),
-      issue.epic_id
-        ? db
-            .selectFrom("epics")
-            .where("id", "=", issue.epic_id)
-            .select(["id", "name"])
-            .executeTakeFirst()
-        : Promise.resolve(null),
-      db
-        .selectFrom("project_members")
-        .innerJoin("users", "users.id", "project_members.user_id")
-        .where("project_members.project_id", "=", issue.project_id)
-        .select(["users.id", "users.username", "users.email", "users.avatar_url"])
-        .execute(),
-      issue.board_id
-        ? db
-            .selectFrom("columns")
-            .where("board_id", "=", issue.board_id)
-            .select(["key", "name"])
-            .orderBy("order_index", "asc")
-            .execute()
-        : Promise.resolve([]),
-      db
-        .selectFrom("sprints")
-        .where("project_id", "=", issue.project_id)
-        .where("status", "!=", "completed")
-        .select(["id", "name", "status"])
-        .execute(),
-    ]);
+  const [
+    project,
+    reporter,
+    assignee,
+    labelRows,
+    epic,
+    members,
+    statuses,
+    sprints,
+  ] = await Promise.all([
+    db
+      .selectFrom("projects")
+      .where("id", "=", issue.project_id)
+      .select(["name"])
+      .executeTakeFirst(),
+    db
+      .selectFrom("users")
+      .where("id", "=", issue.reporter_id)
+      .select(["id", "username", "email", "avatar_url"])
+      .executeTakeFirst(),
+    issue.assignee_id
+      ? db
+          .selectFrom("users")
+          .where("id", "=", issue.assignee_id)
+          .select(["id", "username", "email", "avatar_url"])
+          .executeTakeFirst()
+      : Promise.resolve(null),
+    db
+      .selectFrom("issue_labels")
+      .innerJoin("labels", "labels.id", "issue_labels.label_id")
+      .where("issue_labels.issue_id", "=", issueId)
+      .select(["labels.name"])
+      .execute(),
+    issue.epic_id
+      ? db
+          .selectFrom("epics")
+          .where("id", "=", issue.epic_id)
+          .select(["id", "name"])
+          .executeTakeFirst()
+      : Promise.resolve(null),
+    db
+      .selectFrom("project_members")
+      .innerJoin("users", "users.id", "project_members.user_id")
+      .where("project_members.project_id", "=", issue.project_id)
+      .select(["users.id", "users.username", "users.email", "users.avatar_url"])
+      .execute(),
+    issue.board_id
+      ? db
+          .selectFrom("columns")
+          .where("board_id", "=", issue.board_id)
+          .select(["key", "name"])
+          .orderBy("order_index", "asc")
+          .execute()
+      : Promise.resolve([]),
+    db
+      .selectFrom("sprints")
+      .where("project_id", "=", issue.project_id)
+      .where("status", "!=", "completed")
+      .select(["id", "name", "status"])
+      .execute(),
+  ]);
 
   if (!project) redirect("/");
 
@@ -115,6 +124,7 @@ export default async function EditTaskPage({
         dueDate: issue.due_date,
         editPermission: issue.edit_permission,
         sprintId: issue.sprint_id,
+        storyPoints: issue.story_points ?? null,
         labels: labelRows.map((l) => l.name),
         epic: epic ? { id: epic.id, name: epic.name } : null,
         assignee: assignee

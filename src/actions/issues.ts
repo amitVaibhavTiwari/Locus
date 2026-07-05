@@ -107,6 +107,10 @@ export async function createIssue(
       | "anyone"
       | "assignee_only"
       | "reporter_only") || "anyone";
+  const storyPointsRaw = formData.get("story_points")?.toString();
+  const storyPoints = storyPointsRaw
+    ? parseFloat(storyPointsRaw) || null
+    : null;
 
   const project = await db
     .selectFrom("projects")
@@ -156,6 +160,7 @@ export async function createIssue(
       due_date: dueDate,
       completed_at: completedAt,
       edit_permission: editPermission,
+      story_points: storyPoints,
       archived: 0,
       archived_at: null,
       created_at: now,
@@ -289,6 +294,8 @@ export async function updateIssue(
     | undefined;
   const labelsJson = formData.get("labels")?.toString();
   const labelNames: string[] = labelsJson ? JSON.parse(labelsJson) : [];
+  const spRaw = formData.get("story_points")?.toString();
+  const storyPoints = spRaw ? parseFloat(spRaw) || null : null;
 
   const issue = await db
     .selectFrom("issues")
@@ -305,6 +312,7 @@ export async function updateIssue(
       "due_date",
       "epic_id",
       "sprint_id",
+      "story_points",
       "issue_number",
     ])
     .executeTakeFirst();
@@ -347,6 +355,12 @@ export async function updateIssue(
       from: issue.edit_permission,
       to: editPermission,
     });
+  if ((issue.story_points ?? null) !== storyPoints)
+    changes.push({
+      field: "story_points",
+      from: issue.story_points?.toString() ?? null,
+      to: storyPoints?.toString() ?? null,
+    });
 
   const now = new Date().toISOString();
   await db
@@ -359,6 +373,7 @@ export async function updateIssue(
       due_date: dueDate,
       epic_id: epicId || null,
       sprint_id: sprintId,
+      story_points: storyPoints,
       ...(editPermission ? { edit_permission: editPermission } : {}),
       updated_at: now,
     })
