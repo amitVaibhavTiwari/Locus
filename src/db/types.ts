@@ -302,6 +302,32 @@ export interface LinksTable {
   updated_at: string;
 }
 
+export interface PushSubscriptionsTable {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  is_valid: number;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export interface NotificationsTable {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  type: string;
+  title: string;
+  body: string;
+  url: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  is_read: number;
+  created_at: string;
+}
+
 export interface Database {
   users: UsersTable;
   accounts: AccountsTable;
@@ -329,4 +355,6 @@ export interface Database {
   notes: NotesTable;
   note_items: NoteItemsTable;
   links: LinksTable;
+  push_subscriptions: PushSubscriptionsTable;
+  notifications: NotificationsTable;
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import { notify } from "@/lib/notifications";
 
 const LABEL_COLORS = [
   "#3b82f6",
@@ -415,6 +416,45 @@ export async function updateIssue(
       })
       .execute();
   });
+
+  // notify if asignee changes and it's not the current user
+  if (
+    assigneeId &&
+    assigneeId !== issue.assignee_id &&
+    assigneeId !== session.user.id
+  ) {
+    after(async () => {
+      const [assigner, assignee, org] = await Promise.all([
+        db
+          .selectFrom("users")
+          .where("id", "=", session.user.id)
+          .select(["username"])
+          .executeTakeFirst(),
+        db
+          .selectFrom("users")
+          .where("id", "=", assigneeId)
+          .select(["username"])
+          .executeTakeFirst(),
+        db
+          .selectFrom("organizations")
+          .where("id", "=", issue.organization_id)
+          .select(["name"])
+          .executeTakeFirst(),
+      ]);
+
+      const shortTitle = title.length > 55 ? title.slice(0, 55) + "…" : title;
+      const workspace = org?.name ?? "Locus";
+
+      await notify(assigneeId, issue.organization_id, {
+        type: "task_assigned",
+        title: `Task assigned to you — ${workspace}`,
+        body: `Hi ${assignee?.username ?? "there"}, ${assigner?.username ?? "Someone"} assigned "${shortTitle}" to you`,
+        url: `/project/${issue.project_id}/board?task=${issueId}`,
+        entityType: "issue",
+        entityId: issueId,
+      });
+    });
+  }
 
   if (epicId && (issue.epic_id ?? null) !== epicId) {
     after(async () => {

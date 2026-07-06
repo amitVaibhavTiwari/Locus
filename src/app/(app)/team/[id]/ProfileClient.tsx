@@ -1,8 +1,9 @@
 "use client";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +18,8 @@ import {
   Camera,
   ImagePlus,
   Loader2,
+  Bell,
+  BellOff,
 } from "lucide-react";
 
 interface ProfileUser {
@@ -31,6 +34,142 @@ interface ProfileClientProps {
   role: string;
   joinedAt: string | null;
   isOwnProfile: boolean;
+  activeOrgId: string | null;
+}
+
+function urlBase64ToUint8Array(base64: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr.buffer as ArrayBuffer;
+}
+
+function NotificationSection({ activeOrgId }: { activeOrgId: string }) {
+  const [permission, setPermission] =
+    useState<NotificationPermission>("default");
+  const [subscribed, setSubscribed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [currentEndpoint, setCurrentEndpoint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+      setLoading(false);
+      return;
+    }
+    setPermission(Notification.permission);
+
+    navigator.serviceWorker.register("/sw.js").catch(console.error);
+
+    navigator.serviceWorker.ready.then(async (reg) => {
+      const sub = await reg.pushManager.getSubscription();
+      const endpoint = sub?.endpoint ?? null;
+      setCurrentEndpoint(endpoint);
+
+      const params = new URLSearchParams({ orgId: activeOrgId });
+      if (endpoint) params.set("endpoint", endpoint);
+
+      const res = await fetch(`/api/push/status?${params}`);
+      const data = (await res.json()) as {
+        isValid: boolean | null;
+        everAllowed: boolean;
+      };
+      setSubscribed(data.isValid === true);
+      setLoading(false);
+    });
+  }, [activeOrgId]);
+
+  async function handleToggle(enabled: boolean) {
+    setLoading(true);
+    try {
+      if (enabled) {
+        const perm = await Notification.requestPermission();
+        setPermission(perm);
+        if (perm !== "granted") return;
+
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!vapidKey) return;
+
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+        setCurrentEndpoint(sub.endpoint);
+
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...sub.toJSON(), orgId: activeOrgId }),
+        });
+
+        localStorage.removeItem(`push_rejected_${activeOrgId}`);
+        setSubscribed(true);
+      } else {
+        if (currentEndpoint) {
+          await fetch("/api/push/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              endpoint: currentEndpoint,
+              orgId: activeOrgId,
+            }),
+          });
+        }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        await sub?.unsubscribe();
+        setCurrentEndpoint(null);
+        setSubscribed(false);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!vapidKey) return null;
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        Notifications
+      </h2>
+
+      <div className="flex items-center justify-between gap-4 px-3 py-3 border rounded bg-muted/20">
+        <div className="flex items-start gap-3">
+          {subscribed ? (
+            <Bell className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+          ) : (
+            <BellOff className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+          )}
+          <div>
+            <p className="text-sm font-medium">Push notifications</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {permission === "denied"
+                ? "Blocked in browser — enable in browser site settings"
+                : subscribed
+                  ? "You'll receive alerts for task assignments and updates"
+                  : "Enable to get notified even when the app is closed"}
+            </p>
+          </div>
+        </div>
+
+        {permission === "denied" ? (
+          <span className="text-xs text-destructive font-medium shrink-0">
+            Blocked
+          </span>
+        ) : (
+          <Switch
+            checked={subscribed}
+            disabled={loading}
+            onCheckedChange={handleToggle}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 function getInitials(name: string) {
@@ -47,6 +186,7 @@ export function ProfileClient({
   role,
   joinedAt,
   isOwnProfile,
+  activeOrgId,
 }: ProfileClientProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -255,6 +395,12 @@ export function ProfileClient({
               )}
             </div>
           </div>
+
+          {isOwnProfile && activeOrgId && (
+            <div className="mt-8 px-2">
+              <NotificationSection activeOrgId={activeOrgId} />
+            </div>
+          )}
 
           {isEditing && (
             <div className="flex gap-2 mt-8 px-2">

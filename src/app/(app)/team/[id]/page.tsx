@@ -46,6 +46,7 @@ export default async function ProfilePage({
       role={mapOrgRole(role)}
       joinedAt={joinedAt}
       isOwnProfile={session.user.id === user.id}
+      activeOrgId={org?.id ?? null}
     />
   );
 }

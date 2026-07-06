@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { SplashScreen } from "./SplashScreen";
+import { PushNotificationManager } from "./PushNotificationManager";
 import { LogOut, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -49,9 +50,11 @@ function getInitials(name: string) {
 function AppContent({
   children,
   user,
+  activeOrgId,
 }: {
   children: React.ReactNode;
   user: SessionUser;
+  activeOrgId: string;
 }) {
   const router = useRouter();
   const { open } = useSidebar();
@@ -117,6 +120,7 @@ function AppContent({
       </header>
 
       <main className="flex-1 overflow-auto">{children}</main>
+      <PushNotificationManager activeOrgId={activeOrgId} />
     </div>
   );
 }
@@ -153,7 +157,9 @@ export function MainLayout({
           pinnedProjects={pinnedProjects}
           workspaces={workspaces}
         />
-        <AppContent user={user}>{children}</AppContent>
+        <AppContent user={user} activeOrgId={activeOrgId}>
+          {children}
+        </AppContent>
       </SidebarProvider>
     </>
   );
