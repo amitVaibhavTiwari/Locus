@@ -188,9 +188,13 @@ export async function switchWorkspace(orgId: string): Promise<void> {
 
   await db
     .updateTable("user_preferences")
-    .set({ active_organization_id: orgId, updated_at: new Date().toISOString() })
+    .set({
+      active_organization_id: orgId,
+      updated_at: new Date().toISOString(),
+    })
     .where("user_id", "=", session.user.id)
     .execute();
 
+  revalidatePath("/", "layout");
   redirect("/dashboard");
 }

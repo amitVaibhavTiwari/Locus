@@ -3,7 +3,8 @@ import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
 import { signIn } from "@/lib/auth";
 import { generateOtp, hashOtp, verifyOtp } from "@/lib/otp";
-import { sendEmail, otpEmailHtml, otpEmailText } from "@/lib/email";
+import { sendEmail } from "@/lib/email";
+import { otpEmailHtml, otpEmailText } from "@/lib/templates";
 
 export type VerifyState =
   | {

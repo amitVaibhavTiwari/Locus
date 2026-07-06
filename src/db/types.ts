@@ -34,11 +34,21 @@ export interface EmailVerificationTokensTable {
   created_at: string;
 }
 
+export interface LoginOtpsTable {
+  id: string;
+  user_id: string;
+  email: string;
+  otp_hash: string;
+  expires_at: string;
+  created_at: string;
+}
+
 export interface PasswordResetTokensTable {
   id: string;
   user_id: string;
-  token: string;
+  token_hash: string;
   expires_at: string;
+  used: number;
   created_at: string;
 }
 
@@ -296,6 +306,7 @@ export interface Database {
   users: UsersTable;
   accounts: AccountsTable;
   email_verification_tokens: EmailVerificationTokensTable;
+  login_otps: LoginOtpsTable;
   password_reset_tokens: PasswordResetTokensTable;
   organizations: OrganizationsTable;
   organization_members: OrganizationMembersTable;

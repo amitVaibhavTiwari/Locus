@@ -5,10 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { Lock, ArrowRight, Loader2 } from "lucide-react";
+import { Lock, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
 import { loginUser } from "@/actions/auth";
 
-export function LoginForm({ redirectTo }: { redirectTo: string }) {
+export function LoginForm({
+  redirectTo,
+  passwordReset,
+}: {
+  redirectTo: string;
+  passwordReset?: boolean;
+}) {
   const [state, action, pending] = useActionState(loginUser, undefined);
 
   return (
@@ -29,6 +35,13 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             Sign in to continue to your workspace.
           </p>
         </div>
+
+        {passwordReset && (
+          <div className="flex items-center gap-2 text-sm text-success bg-success/10 px-3 py-2 rounded-sm">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            Password updated — sign in with your new password.
+          </div>
+        )}
 
         {state?.error && (
           <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-sm">
@@ -51,12 +64,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
-            <button
-              type="button"
+            <Link
+              href="/forgot-password"
               className="text-xs text-primary hover:underline"
             >
-              Forgot?
-            </button>
+              Forgot password?
+            </Link>
           </div>
           <Input
             id="password"

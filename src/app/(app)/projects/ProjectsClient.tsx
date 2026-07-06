@@ -152,9 +152,9 @@ export function ProjectsClient({
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold text-foreground">Projects</h1>
-            <span className="flex items-center justify-center min-w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold px-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold -mb-1.5">
               {total}
             </span>
           </div>

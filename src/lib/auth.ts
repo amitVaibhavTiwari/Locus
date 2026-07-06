@@ -18,8 +18,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials) return null;
 
-        // Post-OTP-verification auto-signin: called internally after email is verified
-        if (credentials.type === "verified" && credentials.userId) {
+        // Internal auto-signin after email OTP verification or login OTP verification
+        if (
+          (credentials.type === "verified" ||
+            credentials.type === "login-otp-verified") &&
+          credentials.userId
+        ) {
           const user = await db
             .selectFrom("users")
             .where("id", "=", credentials.userId as string)

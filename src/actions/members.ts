@@ -3,7 +3,8 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
-import { sendEmail, inviteEmailHtml, inviteEmailText } from "@/lib/email";
+import { sendEmail } from "@/lib/email";
+import { inviteEmailHtml, inviteEmailText } from "@/lib/templates";
 
 export type InviteResult = { error?: string; successCount?: number };
 

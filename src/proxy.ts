@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const AUTH_PATHS = ["/login", "/signup"];
-const PUBLIC_PATHS = new Set(["/", "/verify-email", ...AUTH_PATHS]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/verify-email",
+  "/verify-login",
+  "/forgot-password",
+  "/reset-password",
+  ...AUTH_PATHS,
+]);
 const PUBLIC_PREFIXES = [
   "/api/auth",
   "/onboarding",
