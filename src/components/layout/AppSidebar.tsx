@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Folder,
@@ -12,6 +12,10 @@ import {
   ChevronRight,
   Check,
   ChevronsUpDown,
+  LogOut,
+  User,
+  Sun,
+  Moon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -21,7 +25,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { switchWorkspace } from "@/actions/organizations";
+import { logoutUser } from "@/actions/auth";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Sidebar,
   SidebarContent,
@@ -38,14 +45,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-const getMainNavigation = (role: "owner" | "admin" | "member") => [
+const getMainNavigation = () => [
   { title: "Home", url: "/dashboard", icon: LayoutDashboard },
   { title: "Projects", url: "/projects", icon: Folder },
   { title: "Team", url: "/team", icon: Users },
-];
-
-const settingsNavigation = [
-  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 type SubMenuItem =
@@ -68,12 +71,27 @@ const getProjectSubMenu = (projectId: string): SubMenuItem[] => [
   { title: "Settings", url: `/project/${projectId}/settings` },
 ];
 
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 interface AppSidebarProps {
   workspaceName: string;
   activeOrgId: string;
   userRole: "owner" | "admin" | "member";
   pinnedProjects: { id: string; name: string }[];
   workspaces: { id: string; name: string; brandColor: string | null }[];
+  user: {
+    id: string;
+    email: string;
+    username: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 export function AppSidebar({
@@ -82,10 +100,13 @@ export function AppSidebar({
   userRole,
   pinnedProjects,
   workspaces,
+  user,
 }: AppSidebarProps) {
   const currentPath = usePathname();
+  const router = useRouter();
   const [openProjects, setOpenProjects] = useState<Record<string, boolean>>({});
   const [openArchived, setOpenArchived] = useState<Record<string, boolean>>({});
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [, startTransition] = useTransition();
 
   const toggleProject = (projectId: string) => {
@@ -116,6 +137,12 @@ export function AppSidebar({
         : "hover:bg-secondary text-muted-foreground hover:text-sidebar-accent-foreground"
     }`;
 
+  const { theme, setTheme } = useTheme();
+  const displayName = user?.username ?? "User";
+  const initials = getInitials(displayName);
+  const workspaceLogo =
+    theme === "dark" ? "/locus_dark_logo.png" : "/locus_light_logo.png";
+
   return (
     <Sidebar className="bg-accent/5 border-r border-border">
       <SidebarContent>
@@ -123,16 +150,22 @@ export function AppSidebar({
           {workspaces.length > 1 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center justify-between w-full rounded-md hover:bg-secondary transition-colors px-2 py-1.5 -mx-2 group">
-                  <div className="text-left min-w-0">
+                <button className="flex items-center gap-3 w-full rounded-md hover:bg-secondary transition-colors px-2 py-1.5 -mx-2 group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={workspaceLogo}
+                    alt=""
+                    className="w-8 h-8 shrink-0"
+                  />
+                  <div className="text-left min-w-0 flex-1">
                     <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 font-medium mb-0.5">
                       Workspace
                     </p>
-                    <p className="font-bold text-base text-foreground truncate leading-tight">
+                    <span className="font-bold text-base text-foreground truncate leading-tight block">
                       {workspaceName}
-                    </p>
+                    </span>
                   </div>
-                  <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0 opacity-40 group-hover:opacity-100 transition-opacity ml-2" />
+                  <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="bottom" align="start" className="w-56">
@@ -158,13 +191,17 @@ export function AppSidebar({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <div className="px-2 py-1.5 -mx-2">
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 font-medium mb-0.5">
-                Workspace
-              </p>
-              <p className="font-bold text-base text-foreground truncate leading-tight">
-                {workspaceName}
-              </p>
+            <div className="flex items-center gap-3 px-2 py-1.5 -mx-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={workspaceLogo} alt="" className="w-8 h-8 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 font-medium mb-0.5">
+                  Workspace
+                </p>
+                <span className="font-bold text-base text-foreground truncate leading-tight block">
+                  {workspaceName}
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -175,7 +212,7 @@ export function AppSidebar({
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {getMainNavigation(userRole).map((item) => (
+              {getMainNavigation().map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url} className={getNavClassName(item.url)}>
@@ -285,29 +322,86 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {userRole === "owner" && (
-          <div className="mt-auto border-t border-border">
-            <SidebarGroup className="px-3 py-2">
-              <SidebarGroupContent>
-                <SidebarMenu className="space-y-1">
-                  {settingsNavigation.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild>
-                        <Link
-                          href={item.url}
-                          className={getNavClassName(item.url)}
-                        >
-                          <item.icon className="w-5 h-5 mr-3" />
-                          <span className="font-medium">{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+        <div className="mt-auto border-t border-border">
+          <div className="px-3 py-3">
+            <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 w-full rounded-md hover:bg-secondary transition-colors px-2 py-2 -mx-2 group">
+                  <Avatar className="w-8 h-8 shrink-0">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-left min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate leading-tight">
+                      {displayName}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user?.email ?? ""}
+                    </p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-56">
+                <DropdownMenuItem
+                  onClick={() => router.push(`/team/${user?.id}`)}
+                  className="cursor-pointer"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-sm">Theme</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setTheme("light");
+                        setUserMenuOpen(false);
+                      }}
+                      className={`p-1.5 rounded transition-colors ${theme === "light" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <Sun className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTheme("dark");
+                        setUserMenuOpen(false);
+                      }}
+                      className={`p-1.5 rounded transition-colors ${theme === "dark" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <Moon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                {userRole === "owner" && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => router.push("/settings")}
+                      className="cursor-pointer"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Workspace Settings
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() =>
+                    startTransition(() => {
+                      logoutUser();
+                    })
+                  }
+                  className="cursor-pointer text-destructive"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        )}
+        </div>
       </SidebarContent>
     </Sidebar>
   );

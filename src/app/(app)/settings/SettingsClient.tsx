@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Save, Sun, Moon, Pipette, Loader2 } from "lucide-react";
+import { Save, Pipette, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useTheme } from "@/contexts/ThemeContext";
 import {
   Popover,
   PopoverContent,
@@ -102,7 +101,6 @@ export function SettingsClient({
   initialAllowAdminInvite,
 }: SettingsClientProps) {
   const { toast } = useToast();
-  const { theme, toggleTheme } = useTheme();
 
   const currentHsl = hslFromBrandColor(initialBrandColor);
   const matchingPreset = THEME_COLORS.find((c) => c.hsl === currentHsl);
@@ -158,29 +156,6 @@ export function SettingsClient({
           Manage your workspace settings and preferences
         </p>
       </div>
-
-      <section className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <Label className="text-base font-medium">Dark mode</Label>
-            <p className="text-sm text-muted-foreground">
-              Toggle between light and dark theme
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={toggleTheme}
-            className="h-9 w-9"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4" />
-            ) : (
-              <Moon className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </section>
 
       <form action={saveAction}>
         <input
