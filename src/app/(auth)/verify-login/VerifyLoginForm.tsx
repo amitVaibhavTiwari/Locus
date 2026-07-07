@@ -42,7 +42,10 @@ export function VerifyLoginForm({ email, redirectTo }: VerifyLoginFormProps) {
     }
   }
 
-  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) {
     if (e.key === "Backspace" && !digits[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -50,10 +53,15 @@ export function VerifyLoginForm({ email, redirectTo }: VerifyLoginFormProps) {
 
   function handlePaste(e: React.ClipboardEvent) {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 6);
     if (!pasted) return;
     const newDigits = [...digits];
-    pasted.split("").forEach((char, i) => { newDigits[i] = char; });
+    pasted.split("").forEach((char, i) => {
+      newDigits[i] = char;
+    });
     setDigits(newDigits);
     const focusIndex = Math.min(pasted.length, 5);
     inputRefs.current[focusIndex]?.focus();
@@ -102,7 +110,9 @@ export function VerifyLoginForm({ email, redirectTo }: VerifyLoginFormProps) {
               {digits.map((digit, i) => (
                 <input
                   key={i}
-                  ref={(el) => { inputRefs.current[i] = el; }}
+                  ref={(el) => {
+                    inputRefs.current[i] = el;
+                  }}
                   type="text"
                   inputMode="numeric"
                   maxLength={2}
@@ -156,13 +166,18 @@ export function VerifyLoginForm({ email, redirectTo }: VerifyLoginFormProps) {
             <span className="text-xs text-success">Code sent!</span>
           )}
           {resendState?.error && (
-            <span className="text-xs text-destructive">{resendState.error}</span>
+            <span className="text-xs text-destructive">
+              {resendState.error}
+            </span>
           )}
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
           Wrong account?{" "}
-          <Link href="/login" className="text-foreground font-medium hover:underline">
+          <Link
+            href="/login"
+            className="text-foreground font-medium hover:underline"
+          >
             Back to sign in
           </Link>
         </p>

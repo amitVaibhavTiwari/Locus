@@ -5,6 +5,7 @@ import { AppSidebar } from "./AppSidebar";
 import { SplashScreen } from "./SplashScreen";
 import { PushNotificationManager } from "./PushNotificationManager";
 import { useTheme } from "@/contexts/ThemeContext";
+import { usePathname } from "next/navigation";
 
 type SessionUser = {
   id: string;
@@ -35,6 +36,8 @@ export function MainLayout({
   workspaces,
 }: MainLayoutProps) {
   const { theme } = useTheme();
+  const pathname = usePathname();
+  const isDashboard = pathname === "/dashboard";
   const [splashKey, setSplashKey] = useState(0);
   const prevTheme = useRef(theme);
 
@@ -72,7 +75,7 @@ export function MainLayout({
           style={{ paddingLeft: "var(--sidebar-width)" }}
           className="flex flex-col min-h-svh w-full bg-background"
         >
-          <main className="flex-1 overflow-auto">{children}</main>
+          <main className={`flex-1 overflow-auto${isDashboard ? "" : " pt-6"}`}>{children}</main>
           <PushNotificationManager activeOrgId={activeOrgId} />
         </div>
       </SidebarProvider>

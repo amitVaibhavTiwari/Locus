@@ -1,6 +1,6 @@
 # Locus
 
-Locus is the easiest self-hostable project management tool that runs entirely on Next.js. There's no need for a separate backend server or companion services.
+Locus is the easiest self-hostable project management tool that runs entirely on Next.js.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
@@ -58,7 +58,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Minimum `.env.local` to get running:
+Minimum `.env` to get running:
 
 ```env
 DATABASE_URL=./dev.db
@@ -75,7 +75,7 @@ Email, storage, and push notifications are optional. If the env vars aren't set,
 
 ## Self-hosting
 
-Locus is a single Next.js app so deployment is straightforward, no Docker Compose orchestration, no separate services.
+Locus is a single Next.js app so deployment is straightforward.
 
 **Vercel / Railway / Render**
 
@@ -100,7 +100,7 @@ Runs the app as a plain Node.js process. Works on any VPS. Put Nginx in front fo
 
 ## Environment Variables
 
-Full reference is in [`.env.example`](.env.example). The app starts with just the three required vars; every optional feature is independently disabled if its vars are missing.
+A sample .env file is at [`.env.example`](.env.example). The app starts with just the three required vars; every optional feature is independently disabled if its vars are missing.
 
 **Required**
 
@@ -125,7 +125,7 @@ By default users sign up and log in with email and password. If you also want a 
 
 **Email** *(optional)*
 
-Locus sends emails for signup OTP verification, login OTP, workspace invitations, and password reset. You don't need email to run the app locally. If no provider is configured, all OTPs and reset links are printed directly to the server console so you can still use them. No email will be delivered, but the flow still works.
+Locus sends emails during signup, login, workspace invitations, and password resets for OTPs and links. If no provider is configured, all OTPs and reset links are printed directly to the server console so you can still use them. No email will be delivered, but the flow still works.
 
 If you want to disable the login OTP step entirely (useful for local dev or internal teams), set:
 

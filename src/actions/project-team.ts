@@ -60,6 +60,10 @@ export async function removeProjectMember(
     return { error: "Only project managers can remove members" };
   }
 
+  if (userId === session.user.id) {
+    return { error: "You cannot remove yourself from the project." };
+  }
+
   const targetMembership = await getProjectMembership(projectId, userId);
   if (!targetMembership)
     return { error: "User is not a member of this project" };
@@ -108,6 +112,10 @@ export async function changeProjectMemberRole(
   );
   if (!callerMembership || callerMembership.role !== "manager") {
     return { error: "Only project managers can change roles" };
+  }
+
+  if (userId === session.user.id) {
+    return { error: "You cannot change your own role." };
   }
 
   if (role === "member") {

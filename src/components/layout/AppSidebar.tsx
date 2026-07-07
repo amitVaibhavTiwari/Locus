@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -138,10 +138,12 @@ export function AppSidebar({
     }`;
 
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const displayName = user?.username ?? "User";
   const initials = getInitials(displayName);
   const workspaceLogo =
-    theme === "dark" ? "/locus_dark_logo.png" : "/locus_light_logo.png";
+    mounted && theme === "dark" ? "/locus_dark_logo.png" : "/locus_light_logo.png";
 
   return (
     <Sidebar className="bg-accent/5 border-r border-border">

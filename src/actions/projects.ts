@@ -35,6 +35,11 @@ export async function createProject(
   const orgId = await getActiveOrgId(session.user.id);
   if (!orgId) return { error: "No active organization" };
 
+  const callerMembership = await getOrgMembership(orgId, session.user.id);
+  if (callerMembership?.role !== "owner") {
+    return { error: "Only workspace owners can create projects." };
+  }
+
   const name = formData.get("name")?.toString().trim();
   if (!name) return { error: "Project name is required" };
 

@@ -191,8 +191,72 @@ export async function removeMember(
     return { error: "You do not have permission to remove members" };
   }
 
+  const target = await db
+    .selectFrom("organization_members")
+    .where("id", "=", memberId)
+    .where("organization_id", "=", prefs.active_organization_id)
+    .select(["user_id"])
+    .executeTakeFirst();
+
+  if (target?.user_id === session.user.id) {
+    return { error: "You cannot remove yourself from the workspace." };
+  }
+
   await db
     .deleteFrom("organization_members")
+    .where("id", "=", memberId)
+    .where("organization_id", "=", prefs.active_organization_id)
+    .execute();
+
+  revalidatePath("/team");
+  return undefined;
+}
+
+export async function updateMemberRole(
+  memberId: string,
+  role: "admin" | "member",
+): Promise<{ error?: string } | undefined> {
+  const session = await verifySession();
+
+  const prefs = await db
+    .selectFrom("user_preferences")
+    .where("user_id", "=", session.user.id)
+    .select(["active_organization_id"])
+    .executeTakeFirst();
+
+  if (!prefs?.active_organization_id) return { error: "No active workspace" };
+
+  const callerMembership = await db
+    .selectFrom("organization_members")
+    .where("organization_id", "=", prefs.active_organization_id)
+    .where("user_id", "=", session.user.id)
+    .select(["role"])
+    .executeTakeFirst();
+
+  if (callerMembership?.role !== "owner") {
+    return { error: "Only workspace owners can change member roles." };
+  }
+
+  const target = await db
+    .selectFrom("organization_members")
+    .where("id", "=", memberId)
+    .where("organization_id", "=", prefs.active_organization_id)
+    .select(["user_id", "role"])
+    .executeTakeFirst();
+
+  if (!target) return { error: "Member not found." };
+
+  if (target.user_id === session.user.id) {
+    return { error: "You cannot change your own role." };
+  }
+
+  if (target.role === "owner") {
+    return { error: "The workspace owner's role cannot be changed." };
+  }
+
+  await db
+    .updateTable("organization_members")
+    .set({ role })
     .where("id", "=", memberId)
     .where("organization_id", "=", prefs.active_organization_id)
     .execute();
