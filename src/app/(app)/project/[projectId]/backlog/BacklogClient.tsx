@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Archive,
 } from "lucide-react";
 import {
   Select,
@@ -241,6 +242,7 @@ export function BacklogClient({
   sprints,
 }: BacklogClientProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [searchInput, setSearchInput] = useState("");
@@ -396,14 +398,23 @@ export function BacklogClient({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-foreground">Backlog</h1>
-            <span className="flex items-center justify-center min-w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold px-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs -mb-2 font-semibold">
               {total}
             </span>
           </div>
-          <p className="text-muted-foreground">
-            {projectName} &bull; Issues not assigned to any sprint
+          <p className="text-muted-foreground mt-2">
+            {projectName} &bull; Unscheduled issues waiting to be pulled into a
+            sprint
           </p>
         </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => router.push(`/project/${projectId}/archived`)}
+        >
+          <Archive className="w-4 h-4" />
+          Archived Tasks
+        </Button>
       </div>
 
       <div className="flex gap-3 flex-wrap">

@@ -624,7 +624,7 @@ export function NotesSection({
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Notes */}
         <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
           <CardHeader className="pb-4">

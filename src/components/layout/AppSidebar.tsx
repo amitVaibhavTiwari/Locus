@@ -60,13 +60,6 @@ const getProjectSubMenu = (projectId: string): SubMenuItem[] => [
   { title: "Team", url: `/project/${projectId}/team` },
   { title: "Sprints", url: `/project/${projectId}/sprints` },
   { title: "Backlogs", url: `/project/${projectId}/backlog` },
-  {
-    title: "Archived",
-    children: [
-      { title: "Tasks", url: `/project/${projectId}/archived` },
-      { title: "Epics", url: `/project/${projectId}/archived/epics` },
-    ],
-  },
   { title: "Epics", url: `/project/${projectId}/epics` },
   { title: "Settings", url: `/project/${projectId}/settings` },
 ];

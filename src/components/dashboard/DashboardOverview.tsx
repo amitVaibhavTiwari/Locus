@@ -56,7 +56,7 @@ export function DashboardOverview({
 
   const currentQ = searchParams.get("q") ?? "";
   const currentProject = searchParams.get("project") ?? "all";
-  const currentSort = searchParams.get("sort") ?? "none";
+  const currentSort = searchParams.get("sort") ?? "deadline-asc";
 
   const [inputValue, setInputValue] = useState(currentQ);
 
@@ -89,7 +89,7 @@ export function DashboardOverview({
 
   const setParam = (key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (!value || value === "all" || value === "none") {
+    if (!value || value === "all" || value === "none" || value === "deadline-asc") {
       params.delete(key);
     } else {
       params.set(key, value);
@@ -181,7 +181,6 @@ export function DashboardOverview({
                 <SelectValue placeholder="Sort" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Default order</SelectItem>
                 <SelectItem value="deadline-asc">Earliest deadline</SelectItem>
                 <SelectItem value="deadline-desc">Latest deadline</SelectItem>
               </SelectContent>

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, ChevronDown, Loader2 } from "lucide-react";
+import { Plus, Search, ChevronDown, Loader2, Archive } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -307,6 +307,14 @@ export function EpicsClient({
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => router.push(`/project/${projectId}/archived/epics`)}
+          >
+            <Archive className="w-4 h-4" />
+            Archived
+          </Button>
           <Button
             className="gap-2"
             onClick={() => router.push(`/epics/new?projectId=${projectId}`)}

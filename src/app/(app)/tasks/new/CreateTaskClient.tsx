@@ -74,18 +74,6 @@ interface CreateTaskClientProps {
   defaultStatus: string;
 }
 
-const predefinedLabels = [
-  "Frontend",
-  "Backend",
-  "UI",
-  "Bug",
-  "Feature",
-  "Documentation",
-  "Testing",
-  "Security",
-  "Performance",
-];
-
 function getInitials(username: string) {
   return username
     .split(/\s+/)
@@ -660,23 +648,6 @@ export function CreateTaskClient({
 
           <div className="space-y-3">
             <Label>Labels</Label>
-            <div className="flex flex-wrap gap-2">
-              {predefinedLabels.map((label) => (
-                <Button
-                  key={label}
-                  type="button"
-                  variant={labels.includes(label) ? "default" : "outline"}
-                  size="sm"
-                  onClick={() =>
-                    labels.includes(label)
-                      ? removeLabel(label)
-                      : addLabel(label)
-                  }
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
             <div className="flex gap-2">
               <Input
                 value={customLabel}
