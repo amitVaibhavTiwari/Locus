@@ -15,6 +15,9 @@ const PUBLIC_PREFIXES = [
   "/invite",
   "/_next",
   "/favicon",
+  "/locus_",
+  "/be-nice",
+  "/sw.js",
 ];
 
 export default function proxy(request: NextRequest) {

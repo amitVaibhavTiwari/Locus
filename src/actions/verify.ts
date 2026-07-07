@@ -91,10 +91,14 @@ export async function verifyEmailOtp(
       .selectFrom("organization_invitations")
       .where("token", "=", effectiveInviteToken)
       .where("accepted_at", "is", null)
-      .select(["id", "organization_id", "expires_at"])
+      .select(["id", "organization_id", "expires_at", "email"])
       .executeTakeFirst();
 
-    if (invite && new Date(invite.expires_at) > new Date()) {
+    if (
+      invite &&
+      new Date(invite.expires_at) > new Date() &&
+      invite.email === pending.email
+    ) {
       await db.transaction().execute(async (trx) => {
         await trx
           .insertInto("organization_members")

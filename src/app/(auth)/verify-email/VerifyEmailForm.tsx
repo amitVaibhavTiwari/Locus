@@ -1,9 +1,9 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { ShieldCheck, ArrowRight, Loader2, RotateCcw } from "lucide-react";
+import { ArrowRight, Loader2, RotateCcw } from "lucide-react";
 import { verifyEmailOtp, resendOtp } from "@/actions/verify";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,45 @@ export function VerifyEmailForm({ email, inviteToken }: VerifyEmailFormProps) {
     resendOtp,
     undefined,
   );
+  const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const otp = digits.join("");
+
+  function handleChange(index: number, value: string) {
+    if (!/^\d*$/.test(value)) return;
+    const newDigits = [...digits];
+    newDigits[index] = value.slice(-1);
+    setDigits(newDigits);
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  }
+
+  function handleKeyDown(
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) {
+    if (e.key === "Backspace" && !digits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 6);
+    if (!pasted) return;
+    const newDigits = [...digits];
+    pasted.split("").forEach((char, i) => {
+      newDigits[i] = char;
+    });
+    setDigits(newDigits);
+    const focusIndex = Math.min(pasted.length, 5);
+    inputRefs.current[focusIndex]?.focus();
+  }
 
   if (!email) {
     return (
@@ -35,7 +74,10 @@ export function VerifyEmailForm({ email, inviteToken }: VerifyEmailFormProps) {
           <p className="text-sm text-muted-foreground">
             No email found. Please sign up again.
           </p>
-          <Link href="/signup" className="text-primary text-sm hover:underline">
+          <Link
+            href="/signup"
+            className="text-sm text-foreground font-medium hover:underline"
+          >
             Back to sign up
           </Link>
         </div>
@@ -46,11 +88,8 @@ export function VerifyEmailForm({ email, inviteToken }: VerifyEmailFormProps) {
   return (
     <AuthShell>
       <div className="space-y-6">
-        <div className="space-y-3">
-          <div className="inline-flex items-center justify-center w-11 h-11 rounded-sm bg-primary/10 text-primary">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <h1 className="text-[26px] leading-tight font-semibold tracking-tight">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">
             Check your email
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -62,37 +101,46 @@ export function VerifyEmailForm({ email, inviteToken }: VerifyEmailFormProps) {
           </p>
         </div>
 
-        <form action={verifyAction} className="space-y-4">
+        <form action={verifyAction} className="space-y-6">
           <input type="hidden" name="email" value={email} />
+          <input type="hidden" name="otp" value={otp} />
           {inviteToken && (
             <input type="hidden" name="invite" value={inviteToken} />
           )}
 
-          <div className="space-y-2">
-            <input
-              name="otp"
-              type="text"
-              inputMode="numeric"
-              pattern="\d{6}"
-              maxLength={6}
-              placeholder="000000"
-              autoComplete="one-time-code"
-              autoFocus
-              className={cn(
-                "w-full h-14 text-center text-3xl font-bold tracking-[0.5em] rounded-sm border bg-background outline-none transition-colors",
-                "focus:border-primary",
-                verifyState?.error ? "border-destructive" : "border-input",
-              )}
-            />
+          <div className="space-y-3">
+            <div className="flex gap-2" onPaste={handlePaste}>
+              {digits.map((digit, i) => (
+                <input
+                  key={i}
+                  ref={(el) => {
+                    inputRefs.current[i] = el;
+                  }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={digit}
+                  onChange={(e) => handleChange(i, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(i, e)}
+                  autoFocus={i === 0}
+                  autoComplete={i === 0 ? "one-time-code" : "off"}
+                  className={cn(
+                    "w-full h-12 text-center text-xl font-semibold rounded-sm border bg-background outline-none transition-colors",
+                    "focus:border-primary",
+                    verifyState?.error ? "border-destructive" : "border-input",
+                  )}
+                />
+              ))}
+            </div>
             {verifyState?.error && (
-              <p className="text-xs text-destructive">{verifyState.error}</p>
+              <p className="text-sm text-destructive">{verifyState.error}</p>
             )}
           </div>
 
           <Button
             type="submit"
-            disabled={verifyPending}
-            className="w-full h-11 gap-2"
+            disabled={verifyPending || otp.length < 6}
+            className="w-full h-10 gap-2"
           >
             {verifyPending ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -104,21 +152,21 @@ export function VerifyEmailForm({ email, inviteToken }: VerifyEmailFormProps) {
           </Button>
         </form>
 
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between">
           <form action={resendAction}>
             <input type="hidden" name="email" value={email} />
             <button
               type="submit"
               disabled={resendPending}
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              {resendPending ? "Sending…" : "Resend code"}
+              {resendPending ? "Sending..." : "Resend code"}
             </button>
           </form>
 
           {resendState?.success && (
-            <span className="text-xs text-green-600">New code sent!</span>
+            <span className="text-xs text-success">Code sent!</span>
           )}
           {resendState?.error && (
             <span className="text-xs text-destructive">
@@ -129,7 +177,10 @@ export function VerifyEmailForm({ email, inviteToken }: VerifyEmailFormProps) {
 
         <p className="text-xs text-muted-foreground text-center">
           Wrong email?{" "}
-          <Link href="/signup" className="text-primary hover:underline">
+          <Link
+            href="/signup"
+            className="text-foreground font-medium hover:underline"
+          >
             Back to sign up
           </Link>
         </p>

@@ -39,8 +39,8 @@ export const useWorkspaceStore = create<WorkspaceSettings>()(
   persist(
     (set, get) => ({
       workspaceName: "Locus",
-      themeColor: "orange",
-      customAccentColor: "25 95% 53%",
+      themeColor: "green",
+      customAccentColor: "142 76% 36%",
       accountType: "admin",
       subscriptionType: "pro",
       pinnedProjects: [

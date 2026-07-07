@@ -14,7 +14,7 @@ export async function acceptInvite(
     .selectFrom("organization_invitations")
     .where("token", "=", token)
     .where("accepted_at", "is", null)
-    .select(["id", "organization_id", "expires_at"])
+    .select(["id", "organization_id", "expires_at", "email"])
     .executeTakeFirst();
 
   if (!invite)
@@ -24,6 +24,17 @@ export async function acceptInvite(
 
   if (new Date(invite.expires_at) < new Date())
     return { error: "This invitation has expired." };
+
+  const sessionUser = await db
+    .selectFrom("users")
+    .where("id", "=", session.user.id)
+    .select(["email"])
+    .executeTakeFirst();
+
+  if (!sessionUser) return { error: "User not found." };
+
+  if (invite.email !== sessionUser.email)
+    return { error: "This invitation was sent to a different email address." };
 
   // Check if already a member
   const existing = await db

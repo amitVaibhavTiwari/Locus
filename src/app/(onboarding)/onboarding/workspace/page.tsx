@@ -11,8 +11,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { createWorkspace } from "@/actions/organizations";
 
-const SIZES = ["Just myself", "2-10", "11-50", "51-200", "201-500", "500+"];
-
 const THEME_COLORS: { value: ThemeColor; label: string; hsl: string }[] = [
   { value: "orange", label: "Orange", hsl: "25 95% 53%" },
   { value: "blue", label: "Blue", hsl: "221 83% 53%" },
@@ -22,6 +20,15 @@ const THEME_COLORS: { value: ThemeColor; label: string; hsl: string }[] = [
 ];
 
 type AppearanceMode = "light" | "dark" | "system";
+
+const appHost = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000")
+      .host;
+  } catch {
+    return "localhost:3000";
+  }
+})();
 
 const slugify = (s: string) =>
   s
@@ -38,9 +45,8 @@ export default function CreateWorkspace() {
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [size, setSize] = useState("2-10");
   const [theme, setTheme] = useState<ThemeColor>(
-    storeTheme === "custom" ? "orange" : storeTheme,
+    storeTheme === "custom" ? "green" : storeTheme,
   );
   const [appearance, setAppearance] = useState<AppearanceMode>(() => {
     if (typeof window === "undefined") return "system";
@@ -111,7 +117,7 @@ export default function CreateWorkspace() {
             Create your workspace
           </h1>
           <p className="text-sm text-muted-foreground">
-            A workspace is where your team collaborates on projects.
+            Set up your workspace and pick a look that fits your team.
           </p>
         </div>
 
@@ -132,7 +138,7 @@ export default function CreateWorkspace() {
           <Label htmlFor="slug">Workspace URL</Label>
           <div className="flex items-stretch rounded-sm border border-input bg-background overflow-hidden focus-within:border-primary">
             <span className="px-3 text-sm text-muted-foreground bg-muted/40 border-r border-input flex items-center">
-              locus.app/
+              {appHost}/
             </span>
             <input
               id="slug"
@@ -148,31 +154,7 @@ export default function CreateWorkspace() {
         </div>
 
         <div className="space-y-2">
-          <Label>Team size</Label>
-          <div className="flex flex-wrap gap-2">
-            {SIZES.map((s) => {
-              const active = size === s;
-              return (
-                <button
-                  type="button"
-                  key={s}
-                  onClick={() => setSize(s)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-sm border text-sm transition-colors",
-                    active
-                      ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30",
-                  )}
-                >
-                  {s}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Accent color</Label>
+          <Label>Theme color</Label>
           <div className="flex items-center gap-3">
             {THEME_COLORS.map((c) => {
               const active = theme === c.value;
@@ -183,7 +165,7 @@ export default function CreateWorkspace() {
                   onClick={() => setTheme(c.value)}
                   aria-label={c.label}
                   className={cn(
-                    "w-8 h-8 rounded-sm flex items-center justify-center transition-all",
+                    "w-8 h-8 rounded-full flex items-center justify-center transition-all",
                     active
                       ? "ring-2 ring-offset-2 ring-offset-background ring-foreground/40"
                       : "hover:scale-110",
@@ -212,13 +194,13 @@ export default function CreateWorkspace() {
                   key={opt.value}
                   onClick={() => setAppearance(opt.value)}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1.5 py-3 rounded-sm border text-sm transition-colors",
+                    "flex items-center justify-center gap-2 py-2 rounded-sm border text-sm transition-colors",
                     active
                       ? "border-primary bg-primary/10 text-foreground"
                       : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30",
                   )}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5" />
                   {opt.label}
                 </button>
               );
