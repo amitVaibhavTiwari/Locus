@@ -195,12 +195,12 @@ export function ProjectsClient({
         {projects.map((project) => (
           <div
             key={project.id}
-            className="flex items-center justify-between p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
+            className="flex items-center justify-between p-4 rounded-lg border border-border dark:border-none bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
             onClick={() => router.push(`/project/${project.id}`)}
           >
             <div className="flex items-center gap-4 flex-1">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                <h3 className="font-semibold text-foreground transition-colors">
                   {project.name}
                 </h3>
                 {project.description && (

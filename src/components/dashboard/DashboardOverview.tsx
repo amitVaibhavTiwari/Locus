@@ -2,7 +2,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/input";
 import { Flag, Calendar, Search } from "lucide-react";
 import {
@@ -192,7 +192,7 @@ export function DashboardOverview({
               <ViewTaskDialog
                 key={task.id}
                 trigger={
-                  <div className="p-4 bg-card border border-border rounded-lg hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer flex flex-col gap-2 h-full">
+                  <div className="p-4 bg-card border dark:border-none border-border rounded-lg hover:border-primary/30 hover:shadow-sm transition-all duration-200 cursor-pointer flex flex-col gap-2 h-full">
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {task.project && (
                         <span className="font-medium truncate max-w-30">
@@ -257,13 +257,12 @@ export function DashboardOverview({
           </div>
 
           {hasMoreTasks && (
-            <Button
-              variant="outline"
-              className="w-full"
+            <button
+              className="w-full text-sm text-muted-foreground hover:underline cursor-pointer"
               onClick={() => setDisplayedTasks((prev) => prev + 5)}
             >
               Load more ({tasks.length - displayedTasks} remaining)
-            </Button>
+            </button>
           )}
 
           {visibleTasks.length === 0 && (

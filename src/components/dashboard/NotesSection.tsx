@@ -626,7 +626,7 @@ export function NotesSection({
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Notes */}
-        <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
+        <Card className="bg-card border border-border dark:border-none hover:shadow-md transition-shadow duration-200">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
@@ -808,7 +808,7 @@ export function NotesSection({
         </Card>
 
         {/* Quick Links */}
-        <Card className="bg-card border border-border hover:shadow-md transition-shadow duration-200">
+        <Card className="bg-card border border-border dark:border-none hover:shadow-md transition-shadow duration-200">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>

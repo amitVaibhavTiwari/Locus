@@ -403,7 +403,7 @@ export function BacklogClient({
             </span>
           </div>
           <p className="text-muted-foreground mt-2">
-            {projectName} &bull; Unscheduled issues waiting to be pulled into a
+            {projectName}  {" "}&bull; Unscheduled issues waiting to be pulled into a
             sprint
           </p>
         </div>
@@ -490,12 +490,12 @@ export function BacklogClient({
           </p>
         </div>
       ) : (
-        <div className="rounded-md border border-border bg-card overflow-hidden">
+        <div className="rounded-md border border-border dark:border-none bg-card overflow-hidden">
           <div className="flex">
             <div className="min-w-[320px] max-w-[320px] border-r border-border bg-card z-10">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b border-border hover:bg-transparent">
+              <Table className="bg-card">
+                <TableHeader className="bg-card">
+                  <TableRow className="border-b border-border hover:bg-transparent bg-card">
                     <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 h-11 px-5">
                       Title
                     </TableHead>

@@ -344,7 +344,7 @@ export function ProjectTeamClient({
             <h1 className="text-3xl font-bold text-foreground">
               {projectName} - Team
             </h1>
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold -mb-1.5">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold -mb-2">
               {total}
             </span>
           </div>
@@ -486,7 +486,7 @@ export function ProjectTeamClient({
           <div
             key={member.userId}
             onClick={() => router.push(`/team/${member.userId}`)}
-            className="flex items-center justify-between p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
+            className="flex items-center justify-between p-4 rounded-lg border border-border dark:border-none bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
           >
             <div className="flex items-center gap-4 flex-1 min-w-0">
               <Avatar className="w-8 h-8 flex-shrink-0">
@@ -496,7 +496,7 @@ export function ProjectTeamClient({
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                <h3 className="font-semibold text-foreground transition-colors">
                   {member.username}
                   {member.userId === currentUserId && (
                     <span className="ml-2 text-xs text-muted-foreground font-normal">

@@ -391,7 +391,7 @@ export function EpicsClient({
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-border border border-border rounded-md bg-card overflow-hidden">
+        <div className="divide-y divide-border border border-border dark:border-none rounded-md bg-card overflow-hidden">
           {epics.map((epic) => {
             const pct =
               epic.totalIssues > 0
@@ -436,7 +436,7 @@ export function EpicsClient({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                    <h3 className="text-base font-semibold text-foreground truncate transition-colors">
                       {epic.name}
                     </h3>
                   </div>

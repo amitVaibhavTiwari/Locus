@@ -139,7 +139,7 @@ export function AppSidebar({
     mounted && theme === "dark" ? "/locus_dark_logo.png" : "/locus_light_logo.png";
 
   return (
-    <Sidebar className="bg-accent/5 border-r border-border">
+    <Sidebar className="bg-accent/5 border-r dark:border-none border-border">
       <SidebarContent>
         <div className="p-4 border-b border-border">
           {workspaces.length > 1 ? (
@@ -317,7 +317,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <div className="mt-auto border-t border-border">
+        <div className="mt-auto border-t border-borde dark:border-none">
           <div className="px-3 py-3">
             <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
               <DropdownMenuTrigger asChild>

@@ -344,7 +344,7 @@ export function TeamClient({
             <div
               key={member.memberId}
               onClick={() => router.push(`/team/${member.userId}`)}
-              className="flex items-center justify-between p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
+              className="flex items-center justify-between p-4 rounded-lg border border-border dark:border-none bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
             >
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <Avatar className="w-8 h-8 shrink-0">
@@ -354,7 +354,7 @@ export function TeamClient({
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                    <h3 className="font-semibold text-foreground transition-colors">
                       {member.username}
                     </h3>
                     {isSelf && (

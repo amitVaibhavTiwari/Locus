@@ -4,6 +4,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { SplashScreen } from "./SplashScreen";
 import { PushNotificationManager } from "./PushNotificationManager";
+import { NotificationWidget } from "./NotificationWidget";
 import { useTheme } from "@/contexts/ThemeContext";
 import { usePathname } from "next/navigation";
 
@@ -77,6 +78,7 @@ export function MainLayout({
         >
           <main className={`flex-1 overflow-auto${isDashboard ? "" : " pt-6"}`}>{children}</main>
           <PushNotificationManager activeOrgId={activeOrgId} />
+          <NotificationWidget />
         </div>
       </SidebarProvider>
     </>

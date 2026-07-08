@@ -134,7 +134,7 @@ export function SprintsClient({
     const days = daysRemaining(sprint.end_date);
     return (
       <Card
-        className="cursor-pointer bg-card border border-border hover:border-primary/30 hover:shadow-md transition-all duration-200"
+        className="cursor-pointer bg-card border border-border dark:border-none hover:border-primary/30 hover:shadow-md transition-all duration-200"
         onClick={() =>
           router.push(`/project/${projectId}/sprints/${sprint.id}`)
         }

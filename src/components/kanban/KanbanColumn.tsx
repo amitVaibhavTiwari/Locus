@@ -58,13 +58,13 @@ export function KanbanColumn({
     <div className="w-75 shrink-0">
       <div
         ref={setNodeRef}
-        className={`flex flex-col bg-surface/50 rounded-lg border border-border ${
+        className={`flex flex-col bg-surface/50 rounded-lg border dark:border-none border-border ${
           isOver ? "border-primary bg-primary/5" : ""
         } transition-all duration-200`}
       >
-        <div className="sticky top-0 z-10 bg-surface backdrop-blur-sm rounded-t-lg p-4 border-b border-border">
+        <div className="sticky top-0 z-10 bg-surface backdrop-blur-sm rounded-t-lg p-3 border-b border-border">
           <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-foreground">{column.title}</h3>
+            <h3 className="font-semibold text-sm text-foreground">{column.title}</h3>
             {!hideHeaderCount && (
               <Badge variant="secondary" className="text-xs">
                 {tasks.length}

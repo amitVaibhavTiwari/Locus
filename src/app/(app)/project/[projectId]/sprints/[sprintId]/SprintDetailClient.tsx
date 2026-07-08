@@ -671,7 +671,7 @@ export function SprintDetailClient({
 
       {sprint.status !== "planned" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          <Card className="bg-card border border-border">
+          <Card className="bg-card border border-border dark:border-none">
             <CardContent className="p-5 flex items-center gap-5">
               <CircularProgress
                 value={completionPct}
@@ -698,7 +698,7 @@ export function SprintDetailClient({
             </CardContent>
           </Card>
 
-          <Card className="bg-card border border-border">
+          <Card className="bg-card border border-border dark:border-none">
             <CardContent className="p-5 flex items-center gap-5">
               <CircularProgress
                 value={timePct}
@@ -766,7 +766,7 @@ export function SprintDetailClient({
             ].map(({ label, value, icon: Icon, color }) => (
               <div
                 key={label}
-                className="rounded-lg border border-border bg-card p-3 flex items-center gap-3"
+                className="rounded-lg border border-border dark:border-none bg-card p-3 flex items-center gap-3"
               >
                 <div
                   className={`w-9 h-9 rounded-md bg-${color}/10 flex items-center justify-center`}
@@ -786,7 +786,7 @@ export function SprintDetailClient({
       )}
 
       {teamMembers.length > 0 && (
-        <Card className="bg-card border border-border mb-6">
+        <Card className="bg-card border border-border dark:border-none mb-6">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
@@ -867,7 +867,7 @@ export function SprintDetailClient({
         </Card>
       )}
 
-      <Card className="bg-card border border-border">
+      <Card className="bg-card border dark:border-none border-border">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <CardTitle className="text-base">

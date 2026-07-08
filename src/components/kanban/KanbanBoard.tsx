@@ -203,12 +203,12 @@ export function KanbanBoard({
               return (
                 <div
                   key={g.key}
-                  className="rounded-lg border border-border bg-surface/30 w-max"
+                  className="rounded-lg border border-border dark:border-none bg-surface/30 w-max"
                 >
                   {/* Group Header Row */}
                   <button
                     onClick={() => toggleGroup(g.key)}
-                    className="w-full flex items-center gap-3 px-4 py-3 border-b border-border hover:bg-muted/30 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2 border-b border-border hover:bg-muted/30 transition-colors"
                   >
                     {collapsed ? (
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />

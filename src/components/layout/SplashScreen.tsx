@@ -26,7 +26,7 @@ export function SplashScreen() {
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-500",
+        "fixed inset-0 z-[200] flex items-center justify-center transition-opacity duration-500",
         fading ? "opacity-0 pointer-events-none" : "opacity-100",
       )}
       style={{ backgroundColor: isDark ? "#000000" : "#ffffff" }}
