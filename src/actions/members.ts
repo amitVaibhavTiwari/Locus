@@ -107,7 +107,9 @@ export async function inviteTeammates(
           id: randomUUID(),
           organization_id: orgId,
           email,
-          role: invite.role === "admin" ? "admin" : "member",
+          role: (["admin", "viewer"].includes(invite.role)
+            ? invite.role
+            : "member") as "admin" | "member" | "viewer",
           token,
           invited_by: session.user.id,
           accepted_at: null,
@@ -214,7 +216,7 @@ export async function removeMember(
 
 export async function updateMemberRole(
   memberId: string,
-  role: "admin" | "member",
+  role: "admin" | "member" | "viewer",
 ): Promise<{ error?: string } | undefined> {
   const session = await verifySession();
 

@@ -61,6 +61,8 @@ import {
   changeProjectMemberRole,
 } from "@/actions/project-team";
 import { formatDateTime } from "@/lib/date";
+import { useProjectRoleStore } from "@/stores/projectRoleStore";
+import { useUserStore } from "@/stores/userStore";
 
 interface ProjectMember {
   memberId: string;
@@ -86,7 +88,6 @@ interface ProjectTeamClientProps {
   initialHasMore: boolean;
   initialTotal: number;
   availableMembers: AvailableMember[];
-  currentUserId: string;
 }
 
 function getInitials(username: string) {
@@ -105,11 +106,19 @@ export function ProjectTeamClient({
   initialHasMore,
   initialTotal,
   availableMembers: initialAvailableMembers,
-  currentUserId,
 }: ProjectTeamClientProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [, startTransition] = useTransition();
+
+  const currentUserId = useUserStore((s) => s.id);
+  const currentUserRole = useProjectRoleStore(
+    (s) => s.roles[projectId] ?? null,
+  );
+
+  useEffect(() => {
+    useProjectRoleStore.getState().getRole(projectId);
+  }, [projectId]);
 
   const [members, setMembers] = useState<ProjectMember[]>(initialMembers);
   const [available, setAvailable] = useState<AvailableMember[]>(
@@ -124,7 +133,9 @@ export function ProjectTeamClient({
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [addRole, setAddRole] = useState<"manager" | "member">("member");
+  const [addRole, setAddRole] = useState<"manager" | "member" | "viewer">(
+    "member",
+  );
 
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<ProjectMember | null>(
@@ -135,7 +146,9 @@ export function ProjectTeamClient({
   const [changeRoleDialogOpen, setChangeRoleDialogOpen] = useState(false);
   const [memberToChangeRole, setMemberToChangeRole] =
     useState<ProjectMember | null>(null);
-  const [newRole, setNewRole] = useState<"manager" | "member">("member");
+  const [newRole, setNewRole] = useState<"manager" | "member" | "viewer">(
+    "member",
+  );
 
   const offsetRef = useRef(initialMembers.length);
   const searchRef = useRef("");
@@ -429,7 +442,9 @@ export function ProjectTeamClient({
                 <Label>Role</Label>
                 <Select
                   value={addRole}
-                  onValueChange={(v) => setAddRole(v as "manager" | "member")}
+                  onValueChange={(v) =>
+                    setAddRole(v as "manager" | "member" | "viewer")
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -437,12 +452,15 @@ export function ProjectTeamClient({
                   <SelectContent>
                     <SelectItem value="member">Member</SelectItem>
                     <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   {addRole === "manager"
                     ? "Managers can add/remove members and change roles"
-                    : "Members can view and contribute to the project"}
+                    : addRole === "viewer"
+                      ? "Viewers can browse the project but cannot make any changes"
+                      : "Members can view and contribute to the project"}
                 </p>
               </div>
               <div className="flex justify-end gap-3 pt-4">
@@ -477,6 +495,7 @@ export function ProjectTeamClient({
             <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="manager">Manager</SelectItem>
             <SelectItem value="member">Member</SelectItem>
+            <SelectItem value="viewer">Viewer</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -525,49 +544,58 @@ export function ProjectTeamClient({
               <span className="text-sm text-muted-foreground w-20 text-right capitalize">
                 {member.role}
               </span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 flex-shrink-0"
+              {currentUserRole === "manager" &&
+              member.userId !== currentUserId ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 flex-shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMemberToChangeRole(member);
-                      setNewRole(
-                        member.role === "manager" ? "manager" : "member",
-                      );
-                      setChangeRoleDialogOpen(true);
-                    }}
-                  >
-                    <Shield className="w-4 h-4 mr-2" />
-                    Change Role
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMemberToRemove(member);
-                      setUnassignTasksOnRemove(false);
-                      setRemoveDialogOpen(true);
-                    }}
-                  >
-                    <UserMinus className="w-4 h-4 mr-2" />
-                    Remove from Project
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMemberToChangeRole(member);
+                        setNewRole(
+                          member.role === "manager"
+                            ? "manager"
+                            : member.role === "viewer"
+                              ? "viewer"
+                              : "member",
+                        );
+                        setChangeRoleDialogOpen(true);
+                      }}
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Change Role
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMemberToRemove(member);
+                        setUnassignTasksOnRemove(false);
+                        setRemoveDialogOpen(true);
+                      }}
+                    >
+                      <UserMinus className="w-4 h-4 mr-2" />
+                      Remove from Project
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <div className="w-8 h-8 flex-shrink-0" />
+              )}
             </div>
           </div>
         ))}
@@ -654,7 +682,9 @@ export function ProjectTeamClient({
           <div className="py-4">
             <Select
               value={newRole}
-              onValueChange={(v) => setNewRole(v as "manager" | "member")}
+              onValueChange={(v) =>
+                setNewRole(v as "manager" | "member" | "viewer")
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select role" />
@@ -662,6 +692,7 @@ export function ProjectTeamClient({
               <SelectContent>
                 <SelectItem value="manager">Manager</SelectItem>
                 <SelectItem value="member">Member</SelectItem>
+                <SelectItem value="viewer">Viewer</SelectItem>
               </SelectContent>
             </Select>
           </div>

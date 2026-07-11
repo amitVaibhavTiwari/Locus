@@ -1,4 +1,5 @@
 "use server";
+import { cookies } from "next/headers";
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -14,7 +15,7 @@ export async function acceptInvite(
     .selectFrom("organization_invitations")
     .where("token", "=", token)
     .where("accepted_at", "is", null)
-    .select(["id", "organization_id", "expires_at", "email"])
+    .select(["id", "organization_id", "expires_at", "email", "role"])
     .executeTakeFirst();
 
   if (!invite)
@@ -57,7 +58,7 @@ export async function acceptInvite(
         id: randomUUID(),
         organization_id: invite.organization_id,
         user_id: session.user.id,
-        role: "member",
+        role: (invite.role as "admin" | "member" | "viewer") ?? "member",
         joined_at: now,
         last_active_at: now,
       })
@@ -87,6 +88,13 @@ export async function acceptInvite(
     }
   });
 
+  const jar = await cookies();
+  jar.set("active-org-id", invite.organization_id, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
   revalidatePath("/", "layout");
   redirect("/dashboard");
 }

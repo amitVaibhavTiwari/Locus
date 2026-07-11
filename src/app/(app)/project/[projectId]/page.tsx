@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import {
-  getSessionUser,
-  getActiveOrg,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
   getProject,
   getPinnedProjects,
   getProjectBoard,
@@ -17,13 +17,16 @@ export default async function ProjectBoardPage({
 }) {
   const { projectId } = await params;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const [project, pinnedProjects, board, projectMembers, activeSprint] =
     await Promise.all([
-      getProject(projectId, org.id, user.id),
-      getPinnedProjects(user.id, org.id),
+      getProject(projectId, orgId, userId),
+      getPinnedProjects(userId, orgId),
       getProjectBoard(projectId),
       getProjectMembers(projectId),
       getActiveSprint(projectId),

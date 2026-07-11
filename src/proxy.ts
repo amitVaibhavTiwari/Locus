@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { NextResponse } from "next/server";
 
 const AUTH_PATHS = ["/login", "/signup"];
 const PUBLIC_PATHS = new Set([
@@ -20,31 +21,35 @@ const PUBLIC_PREFIXES = [
   "/sw.js",
 ];
 
-export default function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  const sessionToken =
-    request.cookies.get("authjs.session-token")?.value ??
-    request.cookies.get("__Secure-authjs.session-token")?.value;
-
-  const isLoggedIn = !!sessionToken;
+  const isLoggedIn = !!req.auth?.user?.id;
   const isPublic = PUBLIC_PATHS.has(pathname);
   const isAuthPage = AUTH_PATHS.includes(pathname);
 
   if (!isLoggedIn && !isPublic) {
-    return NextResponse.redirect(new URL("/login", request.nextUrl));
+    return NextResponse.redirect(new URL("/login", req.nextUrl));
   }
 
   if (isLoggedIn && isAuthPage) {
-    return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 
-  return NextResponse.next();
-}
+  const res = NextResponse.next();
+  if (req.auth?.user?.id) {
+    res.headers.set("x-user-id", req.auth.user.id);
+  }
+  const orgId = req.cookies.get("active-org-id")?.value;
+  if (orgId) {
+    res.headers.set("x-org-id", orgId);
+  }
+  return res;
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],

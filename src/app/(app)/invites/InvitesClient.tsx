@@ -39,7 +39,7 @@ import { formatDateTime } from "@/lib/date";
 interface Invite {
   id: string;
   email: string;
-  role: "admin" | "member";
+  role: "admin" | "member" | "viewer";
   token: string;
   expires_at: string;
   created_at: string;
@@ -193,6 +193,7 @@ export function InvitesClient({ invites: initialInvites }: InvitesClientProps) {
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -234,6 +235,7 @@ export function InvitesClient({ invites: initialInvites }: InvitesClientProps) {
             <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="member">Member</SelectItem>
+            <SelectItem value="viewer">Viewer</SelectItem>
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -275,7 +277,12 @@ export function InvitesClient({ invites: initialInvites }: InvitesClientProps) {
                 </div>
                 <div className="flex items-center gap-4 mt-0.5 flex-wrap">
                   <span className="text-sm text-muted-foreground capitalize">
-                    Role: {invite.role === "admin" ? "Admin" : "Member"}
+                    Role:{" "}
+                    {invite.role === "admin"
+                      ? "Admin"
+                      : invite.role === "viewer"
+                        ? "Viewer"
+                        : "Member"}
                   </span>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <CalendarDays className="w-3.5 h-3.5" />

@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import {
-  getSessionUser,
-  getActiveOrg,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
   getProject,
-  getCurrentUserOrgRole,
+  getOrgMemberRole,
 } from "@/lib/dal";
 import { ProjectSettingsClient } from "./ProjectSettingsClient";
 
@@ -14,18 +14,19 @@ export default async function ProjectSettingsPage({
 }) {
   const { projectId } = await params;
 
-  const [user, org, userRole] = await Promise.all([
-    getSessionUser(),
-    getActiveOrg(),
-    getCurrentUserOrgRole(),
-  ]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
+
+  const userRole = await getOrgMemberRole(userId, orgId);
 
   if (!userRole || !["owner", "admin"].includes(userRole)) {
     redirect(`/project/${projectId}`);
   }
 
-  const project = await getProject(projectId, org.id, user.id);
+  const project = await getProject(projectId, orgId, userId);
   if (!project) notFound();
 
   return (

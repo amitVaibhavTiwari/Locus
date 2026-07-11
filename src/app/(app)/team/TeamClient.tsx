@@ -48,7 +48,7 @@ interface Member {
   userId: string;
   username: string;
   email: string;
-  role: "owner" | "admin" | "member";
+  role: "owner" | "admin" | "member" | "viewer";
   joined_at: string;
   avatar_url: string | null;
 }
@@ -58,7 +58,7 @@ interface TeamClientProps {
   initialHasMore: boolean;
   initialTotal: number;
   currentUserId: string;
-  currentUserRole: "owner" | "admin" | "member";
+  currentUserRole: "owner" | "admin" | "member" | "viewer";
   allowAdminInvite: boolean;
 }
 
@@ -290,6 +290,7 @@ export function TeamClient({
                       <SelectContent>
                         <SelectItem value="Admin">Admin</SelectItem>
                         <SelectItem value="Member">Member</SelectItem>
+                        <SelectItem value="Viewer">Viewer</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -330,6 +331,7 @@ export function TeamClient({
             <SelectItem value="owner">Owner</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="member">Member</SelectItem>
+            <SelectItem value="viewer">Viewer</SelectItem>
           </SelectContent>
         </Select>
       </div>

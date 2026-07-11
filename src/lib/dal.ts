@@ -1,8 +1,35 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+
+// This reads current user's id from the x-user-id header (set by proxy from JWT). Thus preventing unnecessary DB calls in server components.
+export async function getUserIdFromRequest(): Promise<string | null> {
+  const h = await headers();
+  return h.get("x-user-id");
+}
+
+// This reads currently active organization id for the user from the x-org-id header (set by proxy from cookie). If the cookie hasn't been set yet, it falls back to DB query to fetch the active organization id for the user. This is used in server components to avoid unnecessary DB calls.
+export async function getOrgIdFromRequest(): Promise<string | null> {
+  const h = await headers();
+  const fromHeader = h.get("x-org-id");
+  if (fromHeader) return fromHeader;
+
+  const userId = h.get("x-user-id");
+  if (!userId) return null;
+  return getActiveOrgId(userId);
+}
+
+export const getActiveOrgId = cache(async (userId: string) => {
+  const prefs = await db
+    .selectFrom("user_preferences")
+    .where("user_id", "=", userId)
+    .select(["active_organization_id"])
+    .executeTakeFirst();
+  return prefs?.active_organization_id ?? null;
+});
 
 export const verifySession = cache(async () => {
   const session = await auth();
@@ -86,6 +113,16 @@ export const getCurrentUserOrgRole = cache(async () => {
     .select(["role"])
     .executeTakeFirst();
 
+  return member?.role ?? null;
+});
+
+export const getOrgMemberRole = cache(async (userId: string, orgId: string) => {
+  const member = await db
+    .selectFrom("organization_members")
+    .where("organization_id", "=", orgId)
+    .where("user_id", "=", userId)
+    .select(["role"])
+    .executeTakeFirst();
   return member?.role ?? null;
 });
 

@@ -76,7 +76,7 @@ function getInitials(name: string) {
 interface AppSidebarProps {
   workspaceName: string;
   activeOrgId: string;
-  userRole: "owner" | "admin" | "member";
+  userRole: "owner" | "admin" | "member" | "viewer";
   pinnedProjects: { id: string; name: string }[];
   workspaces: { id: string; name: string; brandColor: string | null }[];
   user: {
@@ -132,11 +132,15 @@ export function AppSidebar({
 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const displayName = user?.username ?? "User";
   const initials = getInitials(displayName);
   const workspaceLogo =
-    mounted && theme === "dark" ? "/locus_dark_logo.png" : "/locus_light_logo.png";
+    mounted && theme === "dark"
+      ? "/locus_dark_logo.png"
+      : "/locus_light_logo.png";
 
   return (
     <Sidebar className="bg-accent/5 border-r dark:border-none border-border">

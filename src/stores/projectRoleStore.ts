@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
 
-type ProjectRole = "manager" | "member" | null;
+type ProjectRole = "manager" | "member" | "viewer" | null;
 
 interface ProjectRoleStore {
   roles: Record<string, ProjectRole>;

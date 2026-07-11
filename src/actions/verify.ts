@@ -1,5 +1,6 @@
 "use server";
 import { randomUUID } from "crypto";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { signIn } from "@/lib/auth";
 import { generateOtp, hashOtp, verifyOtp } from "@/lib/otp";
@@ -91,7 +92,7 @@ export async function verifyEmailOtp(
       .selectFrom("organization_invitations")
       .where("token", "=", effectiveInviteToken)
       .where("accepted_at", "is", null)
-      .select(["id", "organization_id", "expires_at", "email"])
+      .select(["id", "organization_id", "expires_at", "email", "role"])
       .executeTakeFirst();
 
     if (
@@ -106,7 +107,7 @@ export async function verifyEmailOtp(
             id: randomUUID(),
             organization_id: invite.organization_id,
             user_id: userId,
-            role: "member",
+            role: (invite.role as "admin" | "member" | "viewer") ?? "member",
             joined_at: now,
             last_active_at: now,
           })
@@ -128,6 +129,13 @@ export async function verifyEmailOtp(
           .execute();
       });
       joinedOrgId = invite.organization_id;
+      const jar = await cookies();
+      jar.set("active-org-id", invite.organization_id, {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+      });
     }
   }
 
