@@ -1,12 +1,19 @@
 import { redirect } from "next/navigation";
-import { getSessionUser, getActiveOrg, getOrgMembers } from "@/lib/dal";
+import {
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
+  getOrgMembers,
+} from "@/lib/dal";
 import { CreateProjectClient } from "./CreateProjectClient";
 
 export default async function CreateProjectPage() {
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
 
-  const members = await getOrgMembers(org.id);
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
+
+  const members = await getOrgMembers(orgId);
 
   return <CreateProjectClient members={members} />;
 }

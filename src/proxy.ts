@@ -13,7 +13,7 @@ const PUBLIC_PATHS = new Set([
 const PUBLIC_PREFIXES = [
   "/api/auth",
   "/onboarding",
-  "/invite",
+  "/invite/",
   "/_next",
   "/favicon",
   "/locus_",

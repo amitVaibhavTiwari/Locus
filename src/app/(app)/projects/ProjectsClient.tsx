@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { pinProject, unpinProject } from "@/actions/projects";
 import { formatDateTime } from "@/lib/date";
+import { useUserStore } from "@/stores/userStore";
 
 interface Project {
   id: string;
@@ -37,7 +38,6 @@ interface ProjectsClientProps {
   initialHasMore: boolean;
   initialTotal: number;
   pinnedIds: string[];
-  userRole: "owner" | "admin" | "member";
 }
 
 export function ProjectsClient({
@@ -45,9 +45,9 @@ export function ProjectsClient({
   initialHasMore,
   initialTotal,
   pinnedIds: initialPinnedIds,
-  userRole,
 }: ProjectsClientProps) {
   const router = useRouter();
+  const userRole = useUserStore((s) => s.orgRole) ?? "member";
   const [, startTransition] = useTransition();
 
   const [searchQuery, setSearchQuery] = useState("");

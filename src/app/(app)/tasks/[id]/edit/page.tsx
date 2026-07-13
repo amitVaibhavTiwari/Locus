@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { verifySession } from "@/lib/dal";
+import { getUserIdFromRequest } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { EditTaskClient } from "./EditTaskClient";
 
@@ -9,7 +9,8 @@ export default async function EditTaskPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: issueId } = await params;
-  const session = await verifySession();
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
 
   const issue = await db
     .selectFrom("issues")
@@ -37,13 +38,13 @@ export default async function EditTaskPage({
 
   if (
     issue.edit_permission === "assignee_only" &&
-    issue.assignee_id !== session.user.id
+    issue.assignee_id !== userId
   ) {
     redirect(`/project/${issue.project_id}`);
   }
   if (
     issue.edit_permission === "reporter_only" &&
-    issue.reporter_id !== session.user.id
+    issue.reporter_id !== userId
   ) {
     redirect(`/project/${issue.project_id}`);
   }

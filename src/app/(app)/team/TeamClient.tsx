@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUserStore } from "@/stores/userStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -57,8 +58,6 @@ interface TeamClientProps {
   initialMembers: Member[];
   initialHasMore: boolean;
   initialTotal: number;
-  currentUserId: string;
-  currentUserRole: "owner" | "admin" | "member" | "viewer";
   allowAdminInvite: boolean;
 }
 
@@ -75,10 +74,10 @@ export function TeamClient({
   initialMembers,
   initialHasMore,
   initialTotal,
-  currentUserId,
-  currentUserRole,
   allowAdminInvite,
 }: TeamClientProps) {
+  const currentUserId = useUserStore((s) => s.id);
+  const currentUserRole = useUserStore((s) => s.orgRole) ?? "member";
   const router = useRouter();
   const { toast } = useToast();
   const [, startTransition] = useTransition();
@@ -345,10 +344,12 @@ export function TeamClient({
           return (
             <div
               key={member.memberId}
-              onClick={() => router.push(`/team/${member.userId}`)}
-              className="flex items-center justify-between p-4 rounded-lg border border-border dark:border-none bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
+              className="flex items-center justify-between p-4 rounded-lg border border-border dark:border-none bg-card hover:bg-muted/50 transition-all duration-200 group"
             >
-              <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div
+                className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer"
+                onClick={() => router.push(`/team/${member.userId}`)}
+              >
                 <Avatar className="w-8 h-8 shrink-0">
                   <AvatarFallback className="text-xs">
                     {getInitials(member.username)}
@@ -394,19 +395,14 @@ export function TeamClient({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={() => {
                           setMemberToArchive(member);
                           setUnassignTasks(false);
                           setArchiveDialogOpen(true);

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useUserStore } from "@/stores/userStore";
 import { Badge } from "@/components/ui/badge";
 
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,6 @@ import {
 
 interface DashboardOverviewProps {
   tasks: Task[];
-  username: string;
   initialNotes: NoteData[];
   initialLinks: LinkData[];
   projects: string[];
@@ -42,13 +42,13 @@ function getGreeting(hour: number): { greeting: string; message: string } {
 
 export function DashboardOverview({
   tasks,
-  username,
   initialNotes,
   initialLinks,
   projects,
 }: DashboardOverviewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const username = useUserStore((s) => s.username) ?? "";
   const [, startTransition] = useTransition();
 
   const [now, setNow] = useState<Date | null>(null);
@@ -89,7 +89,12 @@ export function DashboardOverview({
 
   const setParam = (key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (!value || value === "all" || value === "none" || value === "deadline-asc") {
+    if (
+      !value ||
+      value === "all" ||
+      value === "none" ||
+      value === "deadline-asc"
+    ) {
       params.delete(key);
     } else {
       params.set(key, value);
@@ -134,7 +139,11 @@ export function DashboardOverview({
     <div className="p-8 space-y-10">
       <div>
         <p className="text-sm text-muted-foreground mb-3">
-          {now ? `${dateStr} · ${timeStr}` : <span className="invisible">placeholder</span>}
+          {now ? (
+            `${dateStr} · ${timeStr}`
+          ) : (
+            <span className="invisible">placeholder</span>
+          )}
         </p>
         <h1 className="text-4xl font-bold text-foreground tracking-tight">
           {greeting}, {username}!
@@ -199,7 +208,9 @@ export function DashboardOverview({
                           {task.project}
                         </span>
                       )}
-                      {task.project && <span className="text-border shrink-0">·</span>}
+                      {task.project && (
+                        <span className="text-border shrink-0">·</span>
+                      )}
                       <span className="shrink-0">TASK-{task.issueNumber}</span>
                     </div>
                     <p className="font-medium text-foreground text-sm leading-snug line-clamp-2">
@@ -209,15 +220,16 @@ export function DashboardOverview({
                     </p>
                     <div className="flex items-center justify-between gap-2 mt-auto pt-1">
                       <div className="flex gap-1 flex-wrap">
-                        {task.labels && task.labels.slice(0, 2).map((label, idx) => (
-                          <Badge
-                            key={idx}
-                            variant="secondary"
-                            className="text-xs py-0 max-w-20 truncate"
-                          >
-                            {label}
-                          </Badge>
-                        ))}
+                        {task.labels &&
+                          task.labels.slice(0, 2).map((label, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="secondary"
+                              className="text-xs py-0 max-w-20 truncate"
+                            >
+                              {label}
+                            </Badge>
+                          ))}
                         {task.labels && task.labels.length > 2 && (
                           <span className="text-xs text-muted-foreground">
                             +{task.labels.length - 2}
@@ -226,7 +238,10 @@ export function DashboardOverview({
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {task.storyPoints != null && (
-                          <Badge variant="secondary" className="text-xs font-semibold">
+                          <Badge
+                            variant="secondary"
+                            className="text-xs font-semibold"
+                          >
                             {task.storyPoints} SP
                           </Badge>
                         )}
@@ -241,10 +256,13 @@ export function DashboardOverview({
                         {task.dueDate && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Calendar className="w-3 h-3" />
-                            {new Date(task.dueDate).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
+                            {new Date(task.dueDate).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                              },
+                            )}
                           </div>
                         )}
                       </div>

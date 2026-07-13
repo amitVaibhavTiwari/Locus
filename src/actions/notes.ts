@@ -2,7 +2,7 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { verifySession, getActiveOrg } from "@/lib/dal";
+import { verifySession, getOrgIdFromRequest } from "@/lib/dal";
 import type { NoteData } from "@/components/dashboard/NotesSection";
 
 export async function createNote(data: {
@@ -12,15 +12,15 @@ export async function createNote(data: {
   items?: string[];
 }): Promise<{ error?: string; note?: NoteData }> {
   const session = await verifySession();
-  const org = await getActiveOrg();
-  if (!org) return { error: "No active workspace" };
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) return { error: "No active workspace" };
 
   const userId = session.user!.id;
 
   const maxRankRow = await db
     .selectFrom("notes")
     .where("user_id", "=", userId)
-    .where("organization_id", "=", org.id)
+    .where("organization_id", "=", orgId)
     .select((eb) => eb.fn.max("rank").as("max_rank"))
     .executeTakeFirst();
   const rank = (maxRankRow?.max_rank ?? -1) + 1;
@@ -33,7 +33,7 @@ export async function createNote(data: {
     .values({
       id,
       user_id: userId,
-      organization_id: org.id,
+      organization_id: orgId,
       type: data.type,
       title: data.title,
       content: data.content ?? null,

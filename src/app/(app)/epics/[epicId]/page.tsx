@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import {
-  getSessionUser,
-  getActiveOrg,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
   getEpic,
   getEpicIssues,
 } from "@/lib/dal";
@@ -14,8 +14,11 @@ export default async function EpicDetailPage({
 }) {
   const { epicId } = await params;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const epic = await getEpic(epicId);
   if (!epic) notFound();

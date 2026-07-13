@@ -504,10 +504,12 @@ export function ProjectTeamClient({
         {members.map((member) => (
           <div
             key={member.userId}
-            onClick={() => router.push(`/team/${member.userId}`)}
-            className="flex items-center justify-between p-4 rounded-lg border border-border dark:border-none bg-card hover:bg-muted/50 transition-all duration-200 cursor-pointer group"
+            className="flex items-center justify-between p-4 rounded-lg border border-border dark:border-none bg-card hover:bg-muted/50 transition-all duration-200 group"
           >
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div
+              className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer"
+              onClick={() => router.push(`/team/${member.userId}`)}
+            >
               <Avatar className="w-8 h-8 flex-shrink-0">
                 {member.avatar_url && <AvatarImage src={member.avatar_url} />}
                 <AvatarFallback className="text-xs">
@@ -552,18 +554,13 @@ export function ProjectTeamClient({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 flex-shrink-0"
-                      onClick={(e) => e.stopPropagation()}
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={() => {
                         setMemberToChangeRole(member);
                         setNewRole(
                           member.role === "manager"
@@ -581,8 +578,7 @@ export function ProjectTeamClient({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={() => {
                         setMemberToRemove(member);
                         setUnassignTasksOnRemove(false);
                         setRemoveDialogOpen(true);

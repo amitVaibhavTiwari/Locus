@@ -1,5 +1,9 @@
 import { notFound, redirect } from "next/navigation";
-import { getSessionUser, getActiveOrg, getProject } from "@/lib/dal";
+import {
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
+  getProject,
+} from "@/lib/dal";
 import { db } from "@/lib/db";
 import { SprintHistoryClient } from "./SprintHistoryClient";
 
@@ -10,11 +14,14 @@ export default async function SprintHistoryPage({
 }) {
   const { projectId, sprintId } = await params;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const [project, sprint] = await Promise.all([
-    getProject(projectId, org.id, user.id),
+    getProject(projectId, orgId, userId),
     db
       .selectFrom("sprints")
       .where("id", "=", sprintId)

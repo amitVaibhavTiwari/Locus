@@ -2,9 +2,10 @@ import React from "react";
 import { redirect } from "next/navigation";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
-  getSessionUser,
-  getActiveOrg,
-  getCurrentUserOrgRole,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
+  getUserById,
+  getOrgMemberRole,
   getPinnedProjects,
   getUserWorkspaces,
 } from "@/lib/dal";
@@ -14,24 +15,29 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [user, org, userRole, workspaces] = await Promise.all([
-    getSessionUser(),
-    getActiveOrg(),
-    getCurrentUserOrgRole(),
-    getUserWorkspaces(),
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
+
+  // I may optimize this in future but it is 4 queries and run only once so for now it is fine. This is server side so I can't use zustand store here.
+  const [user, userRole, workspaces, pinnedProjects] = await Promise.all([
+    getUserById(userId),
+    getOrgMemberRole(userId, orgId),
+    getUserWorkspaces(userId),
+    getPinnedProjects(userId, orgId),
   ]);
-  if (!org) redirect("/onboarding/workspace");
 
-  const orgName = org.workspacePrefs?.display_name ?? org.name;
-  const brandColor = org.workspacePrefs?.brand_color ?? null;
-
-  const pinnedProjects = user ? await getPinnedProjects(user.id, org.id) : [];
+  const currentOrg = workspaces.find((w) => w.id === orgId);
+  const orgName = currentOrg?.name ?? "";
+  const brandColor = currentOrg?.brandColor ?? null;
 
   return (
     <MainLayout
-      user={user}
+      user={user ?? null}
       orgName={orgName}
-      activeOrgId={org.id}
+      activeOrgId={orgId}
       brandColor={brandColor}
       userRole={userRole ?? "member"}
       pinnedProjects={pinnedProjects}

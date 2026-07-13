@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import {
-  getSessionUser,
-  getActiveOrg,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
   getProject,
   getProjectBoard,
   getProjectMembers,
@@ -18,11 +18,14 @@ export default async function CreateTaskPage({
 
   if (!projectId) redirect("/projects");
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const [project, board, projectMembers, allSprints] = await Promise.all([
-    getProject(projectId, org.id, user.id),
+    getProject(projectId, orgId, userId),
     getProjectBoard(projectId),
     getProjectMembers(projectId),
     getProjectSprints(projectId),
@@ -34,7 +37,6 @@ export default async function CreateTaskPage({
     .filter((c) => c.key)
     .map((c) => ({ key: c.key!, name: c.name }));
 
-  // Only active and planned sprints are valid targets for new tasks
   const sprints = allSprints
     .filter((s) => s.status === "active" || s.status === "planned")
     .map((s) => ({ id: s.id, name: s.name, status: s.status }));
@@ -55,7 +57,7 @@ export default async function CreateTaskPage({
       statuses={statuses}
       sprints={sprints}
       initialMembers={initialMembers}
-      currentUserId={user.id}
+      currentUserId={userId}
       defaultStatus={defaultStatus}
     />
   );

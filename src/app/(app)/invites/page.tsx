@@ -1,23 +1,27 @@
 import { redirect } from "next/navigation";
-import { getActiveOrg, getCurrentUserOrgRole, verifySession } from "@/lib/dal";
+import {
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
+  getOrgMemberRole,
+} from "@/lib/dal";
 import { db } from "@/lib/db";
 import { InvitesClient } from "./InvitesClient";
 
 export default async function InvitesPage() {
-  const [session, org, userRole] = await Promise.all([
-    verifySession(),
-    getActiveOrg(),
-    getCurrentUserOrgRole(),
-  ]);
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
 
-  if (!org) redirect("/onboarding/workspace");
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
+
+  const userRole = await getOrgMemberRole(userId, orgId);
   if (userRole !== "owner") redirect("/dashboard");
 
   //  all non-accepted invitations with inviter info
   const inviteRows = await db
     .selectFrom("organization_invitations")
     .leftJoin("users", "users.id", "organization_invitations.invited_by")
-    .where("organization_invitations.organization_id", "=", org.id)
+    .where("organization_invitations.organization_id", "=", orgId)
     .where("organization_invitations.accepted_at", "is", null)
     .select([
       "organization_invitations.id",
@@ -46,5 +50,5 @@ export default async function InvitesPage() {
       | "expired",
   }));
 
-  return <InvitesClient invites={invites} currentUserId={session.user.id} />;
+  return <InvitesClient invites={invites} currentUserId={userId} />;
 }

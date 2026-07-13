@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { verifySession, getActiveOrg } from "@/lib/dal";
+import { getUserIdFromRequest, getOrgIdFromRequest } from "@/lib/dal";
 import { mapOrgRole } from "@/lib/utils";
 import { ProfileClient } from "./ProfileClient";
 
@@ -10,7 +10,11 @@ export default async function ProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [session, org] = await Promise.all([verifySession(), getActiveOrg()]);
+
+  const currentUserId = await getUserIdFromRequest();
+  if (!currentUserId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
 
   const user = await db
     .selectFrom("users")
@@ -23,10 +27,10 @@ export default async function ProfilePage({
   let role: string | null = null;
   let joinedAt: string | null = null;
 
-  if (org) {
+  if (orgId) {
     const membership = await db
       .selectFrom("organization_members")
-      .where("organization_id", "=", org.id)
+      .where("organization_id", "=", orgId)
       .where("user_id", "=", user.id)
       .select(["role", "joined_at"])
       .executeTakeFirst();
@@ -45,8 +49,8 @@ export default async function ProfilePage({
       }}
       role={mapOrgRole(role)}
       joinedAt={joinedAt}
-      isOwnProfile={session.user.id === user.id}
-      activeOrgId={org?.id ?? null}
+      isOwnProfile={currentUserId === user.id}
+      activeOrgId={orgId ?? null}
     />
   );
 }
