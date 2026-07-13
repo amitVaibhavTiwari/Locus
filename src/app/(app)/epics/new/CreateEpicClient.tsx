@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createEpic } from "@/actions/epics";
+import { getInitials } from "@/lib/utils";
 
 interface Member {
   id: string;
@@ -28,15 +29,6 @@ interface CreateEpicClientProps {
   projectName: string;
   members: Member[];
   currentUserId: string;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 export function CreateEpicClient({

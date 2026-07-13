@@ -60,6 +60,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { startSprint, completeSprint, updateSprint } from "@/actions/sprints";
 import { formatDate, daysUntil, daysSince, daysBetween } from "@/lib/date";
+import { getInitials } from "@/lib/utils";
 
 interface Issue {
   id: string;
@@ -107,15 +108,6 @@ function getPriorityColor(priority: string) {
     default:
       return "border-muted-foreground text-muted-foreground";
   }
-}
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 const CircularProgress = ({

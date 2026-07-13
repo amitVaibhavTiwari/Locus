@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, ChevronDown, Loader2, Archive } from "lucide-react";
+import { getInitials } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -48,15 +49,6 @@ interface Filters {
   priority: string;
   status: string;
   ownerId: string;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 function OwnerFilter({

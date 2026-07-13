@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { inviteTeammates, removeMember } from "@/actions/members";
 import { formatDateTime } from "@/lib/date";
-import { mapOrgRole } from "@/lib/utils";
+import { mapOrgRole, getInitials } from "@/lib/utils";
 
 interface Member {
   memberId: string;
@@ -59,15 +59,6 @@ interface TeamClientProps {
   initialHasMore: boolean;
   initialTotal: number;
   allowAdminInvite: boolean;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
 
 export function TeamClient({

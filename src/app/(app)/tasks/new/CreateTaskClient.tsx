@@ -34,7 +34,7 @@ import {
   RichTextEditor,
   type RichTextEditorRef,
 } from "@/components/editor/RichTextEditor";
-import { cn, cleanFilename } from "@/lib/utils";
+import { cn, cleanFilename, getInitials } from "@/lib/utils";
 import {
   Command,
   CommandEmpty,
@@ -72,15 +72,6 @@ interface CreateTaskClientProps {
   initialMembers: Member[];
   currentUserId: string;
   defaultStatus: string;
-}
-
-function getInitials(username: string) {
-  return username
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 function MemberPicker({

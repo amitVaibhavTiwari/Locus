@@ -2,19 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sql } from "kysely";
 import { auth } from "@/lib/auth";
+import { getInitials } from "@/lib/utils";
 
 const PAGE_SIZE_KANBAN = 20;
 const PAGE_SIZE_TABLE = 50;
-
-function getInitials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .map((w) => w[0]?.toUpperCase() ?? "")
-      .join("")
-      .slice(0, 2) || "??"
-  );
-}
 
 type IssueRow = {
   id: string;

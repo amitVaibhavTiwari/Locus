@@ -61,6 +61,7 @@ import {
   changeProjectMemberRole,
 } from "@/actions/project-team";
 import { formatDateTime } from "@/lib/date";
+import { getInitials } from "@/lib/utils";
 import { useProjectRoleStore } from "@/stores/projectRoleStore";
 import { useUserStore } from "@/stores/userStore";
 
@@ -88,15 +89,6 @@ interface ProjectTeamClientProps {
   initialHasMore: boolean;
   initialTotal: number;
   availableMembers: AvailableMember[];
-}
-
-function getInitials(username: string) {
-  return username
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 export function ProjectTeamClient({

@@ -38,6 +38,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { formatDateTime } from "@/lib/date";
+import { getInitials } from "@/lib/utils";
 
 interface Epic {
   id: string;
@@ -80,15 +81,6 @@ const PRIORITY_DOT: Record<string, string> = {
   low: "bg-success",
   none: "bg-muted-foreground",
 };
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
 
 function OwnerFilter({
   value,

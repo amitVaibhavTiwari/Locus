@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDateTime } from "@/lib/date";
+import { getInitials } from "@/lib/utils";
 
 interface Issue {
   id: string;
@@ -68,15 +69,6 @@ const PRIORITY_DOT: Record<string, string> = {
   low: "bg-success",
   none: "bg-muted-foreground",
 };
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
 
 type SortOption =
   | "archived_at_desc"

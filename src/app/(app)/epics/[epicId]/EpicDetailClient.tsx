@@ -49,6 +49,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ViewTaskDialog } from "@/components/dialogs/ViewTaskDialog";
 import { updateEpicStatus, updateEpic, archiveEpic } from "@/actions/epics";
 import { useProjectRoleStore } from "@/stores/projectRoleStore";
+import { getInitials } from "@/lib/utils";
 
 interface User {
   id: string;
@@ -88,15 +89,6 @@ interface Epic {
 interface EpicDetailClientProps {
   epic: Epic;
   issues: Issue[];
-}
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 function formatDate(d: string | null) {

@@ -44,6 +44,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { getInitials } from "@/lib/utils";
 
 const getMainNavigation = () => [
   { title: "Home", url: "/dashboard", icon: LayoutDashboard },
@@ -63,15 +64,6 @@ const getProjectSubMenu = (projectId: string): SubMenuItem[] => [
   { title: "Epics", url: `/project/${projectId}/epics` },
   { title: "Settings", url: `/project/${projectId}/settings` },
 ];
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 interface AppSidebarProps {
   workspaceName: string;

@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { updateProfile } from "@/actions/profile";
+import { getInitials } from "@/lib/utils";
 import {
   Mail,
   Calendar,
@@ -170,15 +171,6 @@ function NotificationSection({ activeOrgId }: { activeOrgId: string }) {
       </div>
     </div>
   );
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
 
 export function ProfileClient({
