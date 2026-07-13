@@ -66,7 +66,7 @@ export interface OrganizationMembersTable {
   id: string;
   organization_id: string;
   user_id: string;
-  role: "owner" | "admin" | "member";
+  role: "owner" | "admin" | "member" | "viewer";
   joined_at: string;
   last_active_at: string | null;
 }
@@ -75,7 +75,7 @@ export interface OrganizationInvitationsTable {
   id: string;
   organization_id: string;
   email: string;
-  role: "admin" | "member";
+  role: "admin" | "member" | "viewer";
   token: string;
   invited_by: string;
   accepted_at: string | null;
@@ -134,7 +134,7 @@ export interface ProjectMembersTable {
   id: string;
   project_id: string;
   user_id: string;
-  role: "manager" | "member";
+  role: "manager" | "member" | "viewer";
   joined_at: string;
 }
 

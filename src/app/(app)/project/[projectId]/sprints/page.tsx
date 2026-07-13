@@ -1,5 +1,10 @@
 import { notFound, redirect } from "next/navigation";
-import { getSessionUser, getActiveOrg, getProject, getProjectSprints } from "@/lib/dal";
+import {
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
+  getProject,
+  getProjectSprints,
+} from "@/lib/dal";
 import { SprintsClient } from "./SprintsClient";
 
 export default async function SprintsPage({
@@ -9,11 +14,14 @@ export default async function SprintsPage({
 }) {
   const { projectId } = await params;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const [project, sprints] = await Promise.all([
-    getProject(projectId, org.id, user.id),
+    getProject(projectId, orgId, userId),
     getProjectSprints(projectId),
   ]);
 

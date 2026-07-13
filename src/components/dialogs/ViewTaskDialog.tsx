@@ -578,9 +578,13 @@ export function ViewTaskDialog({
                       </div>
                       <span className="text-sm">
                         {taskData?.story_points != null ? (
-                          <span className="font-medium">{taskData.story_points} SP</span>
+                          <span className="font-medium">
+                            {taskData.story_points} SP
+                          </span>
                         ) : (
-                          <span className="text-muted-foreground">Not estimated</span>
+                          <span className="text-muted-foreground">
+                            Not estimated
+                          </span>
                         )}
                       </span>
                     </div>

@@ -1,5 +1,9 @@
 import { notFound, redirect } from "next/navigation";
-import { getSessionUser, getActiveOrg, getProject } from "@/lib/dal";
+import {
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
+  getProject,
+} from "@/lib/dal";
 import { db } from "@/lib/db";
 import { ArchivedClient } from "./ArchivedClient";
 
@@ -12,10 +16,13 @@ export default async function ProjectArchivedPage({
 }) {
   const { projectId } = await params;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
 
-  const project = await getProject(projectId, org.id, user.id);
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
+
+  const project = await getProject(projectId, orgId, userId);
   if (!project) notFound();
 
   const archivedBaseQuery = db

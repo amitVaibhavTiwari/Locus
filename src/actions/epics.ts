@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import { assertNotProjectViewer } from "@/lib/permissions";
 
 export type EpicActionState = { error?: string; epicId?: string } | undefined;
 
@@ -66,6 +67,9 @@ export async function createEpic(
     .select(["organization_id"])
     .executeTakeFirst();
   if (!project) return { error: "Project not found" };
+
+  const viewerErr = await assertNotProjectViewer(projectId, session.user.id);
+  if (viewerErr) return viewerErr;
 
   const epicId = randomUUID();
   const now = new Date().toISOString();

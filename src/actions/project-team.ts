@@ -13,10 +13,26 @@ async function getProjectMembership(projectId: string, userId: string) {
     .executeTakeFirst();
 }
 
+async function getOrgRole(projectId: string, userId: string) {
+  const project = await db
+    .selectFrom("projects")
+    .where("id", "=", projectId)
+    .select(["organization_id"])
+    .executeTakeFirst();
+  if (!project) return null;
+  const membership = await db
+    .selectFrom("organization_members")
+    .where("organization_id", "=", project.organization_id)
+    .where("user_id", "=", userId)
+    .select(["role"])
+    .executeTakeFirst();
+  return membership?.role ?? null;
+}
+
 export async function addProjectMember(
   projectId: string,
   userId: string,
-  role: "manager" | "member" = "member",
+  role: "manager" | "member" | "viewer" = "member",
 ): Promise<{ error?: string }> {
   const session = await verifySession();
 
@@ -29,6 +45,14 @@ export async function addProjectMember(
 
   const existing = await getProjectMembership(projectId, userId);
   if (existing) return { error: "User is already a member of this project" };
+
+  const orgRole = await getOrgRole(projectId, userId);
+  if (orgRole === "viewer" && role !== "viewer") {
+    return {
+      error:
+        "This user is a workspace viewer and can only be added as a project viewer",
+    };
+  }
 
   await db
     .insertInto("project_members")
@@ -102,7 +126,7 @@ export async function removeProjectMember(
 export async function changeProjectMemberRole(
   projectId: string,
   userId: string,
-  role: "manager" | "member",
+  role: "manager" | "member" | "viewer",
 ): Promise<{ error?: string }> {
   const session = await verifySession();
 
@@ -118,7 +142,17 @@ export async function changeProjectMemberRole(
     return { error: "You cannot change your own role." };
   }
 
-  if (role === "member") {
+  if (role !== "viewer") {
+    const orgRole = await getOrgRole(projectId, userId);
+    if (orgRole === "viewer") {
+      return {
+        error:
+          "This user is a workspace viewer and cannot be promoted to a non-viewer project role",
+      };
+    }
+  }
+
+  if (role === "member" || role === "viewer") {
     const managerCount = await db
       .selectFrom("project_members")
       .where("project_id", "=", projectId)

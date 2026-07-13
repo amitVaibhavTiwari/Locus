@@ -7,6 +7,7 @@ import { PushNotificationManager } from "./PushNotificationManager";
 import { NotificationWidget } from "./NotificationWidget";
 import { useTheme } from "@/contexts/ThemeContext";
 import { usePathname } from "next/navigation";
+import { useUserStore } from "@/stores/userStore";
 
 type SessionUser = {
   id: string;
@@ -21,7 +22,7 @@ interface MainLayoutProps {
   orgName: string;
   activeOrgId: string;
   brandColor: string | null;
-  userRole: "owner" | "admin" | "member";
+  userRole: "owner" | "admin" | "member" | "viewer";
   pinnedProjects: { id: string; name: string }[];
   workspaces: { id: string; name: string; brandColor: string | null }[];
 }
@@ -41,6 +42,19 @@ export function MainLayout({
   const isDashboard = pathname === "/dashboard";
   const [splashKey, setSplashKey] = useState(0);
   const prevTheme = useRef(theme);
+  const setUser = useUserStore((s) => s.setUser);
+
+  useEffect(() => {
+    if (!user) return;
+    setUser({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      avatarUrl: user.avatar_url,
+      orgRole: userRole,
+      activeOrgId,
+    });
+  }, [user, userRole, activeOrgId, setUser]);
 
   useEffect(() => {
     if (prevTheme.current !== theme) {
@@ -76,7 +90,9 @@ export function MainLayout({
           style={{ paddingLeft: "var(--sidebar-width)" }}
           className="flex flex-col min-h-svh w-full bg-background"
         >
-          <main className={`flex-1 overflow-auto${isDashboard ? "" : " pt-6"}`}>{children}</main>
+          <main className={`flex-1 overflow-auto${isDashboard ? "" : " pt-6"}`}>
+            {children}
+          </main>
           <PushNotificationManager activeOrgId={activeOrgId} />
           <NotificationWidget />
         </div>

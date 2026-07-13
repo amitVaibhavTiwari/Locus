@@ -1,7 +1,7 @@
 ﻿import { redirect } from "next/navigation";
 import {
-  getSessionUser,
-  getActiveOrg,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
   getProjects,
   getOrgMembers,
 } from "@/lib/dal";
@@ -14,12 +14,15 @@ export default async function NewEpicPage({
 }) {
   const { projectId } = await searchParams;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const [projects, orgMembers] = await Promise.all([
-    getProjects(org.id, user.id),
-    getOrgMembers(org.id),
+    getProjects(orgId, userId),
+    getOrgMembers(orgId),
   ]);
 
   const resolvedProjectId = projectId ?? projects[0]?.id ?? null;
@@ -37,7 +40,7 @@ export default async function NewEpicPage({
         username: m.username,
         avatar_url: m.avatar_url,
       }))}
-      currentUserId={user.id}
+      currentUserId={userId}
     />
   );
 }

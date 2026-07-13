@@ -1,24 +1,29 @@
 import { redirect } from "next/navigation";
-import { getActiveOrg, getCurrentUserOrgRole, verifySession } from "@/lib/dal";
+import { getUserIdFromRequest, getOrgIdFromRequest } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { TeamClient } from "./TeamClient";
 
 const PAGE_SIZE = 15;
 
 export default async function TeamPage() {
-  const [session, org, userRole] = await Promise.all([
-    verifySession(),
-    getActiveOrg(),
-    getCurrentUserOrgRole(),
-  ]);
-  if (!org) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
 
-  const allowAdminInvite = (org.workspacePrefs?.allow_admin_invite ?? 0) === 1;
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
+
+  const workspacePrefs = await db
+    .selectFrom("workspace_preferences")
+    .where("organization_id", "=", orgId)
+    .select(["allow_admin_invite"])
+    .executeTakeFirst();
+
+  const allowAdminInvite = (workspacePrefs?.allow_admin_invite ?? 0) === 1;
 
   const baseQuery = db
     .selectFrom("organization_members")
     .innerJoin("users", "users.id", "organization_members.user_id")
-    .where("organization_members.organization_id", "=", org.id);
+    .where("organization_members.organization_id", "=", orgId);
 
   const [firstBatch, countRow] = await Promise.all([
     baseQuery
@@ -48,8 +53,6 @@ export default async function TeamPage() {
       initialMembers={members}
       initialHasMore={hasMore}
       initialTotal={initialTotal}
-      currentUserId={session.user.id}
-      currentUserRole={userRole ?? "member"}
       allowAdminInvite={allowAdminInvite}
     />
   );

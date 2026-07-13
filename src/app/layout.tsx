@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "Locus Kanban",
+  title: "Locus | Ultimate project management tool for teams.",
   description: "Open source project management.",
   icons: {
     icon: "/locus_favicon.png",

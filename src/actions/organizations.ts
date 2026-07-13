@@ -2,9 +2,20 @@
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+
+async function setActiveOrgCookie(orgId: string) {
+  const jar = await cookies();
+  jar.set("active-org-id", orgId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+}
 
 const WorkspaceSchema = z.object({
   name: z.string().min(1, "Workspace name is required").max(100),
@@ -110,6 +121,7 @@ export async function createWorkspace(
       .execute();
   });
 
+  await setActiveOrgCookie(orgId);
   redirect("/onboarding/invite");
 }
 
@@ -195,6 +207,7 @@ export async function switchWorkspace(orgId: string): Promise<void> {
     .where("user_id", "=", session.user.id)
     .execute();
 
+  await setActiveOrgCookie(orgId);
   revalidatePath("/", "layout");
   redirect("/dashboard");
 }

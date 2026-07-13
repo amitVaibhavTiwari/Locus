@@ -4,8 +4,11 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import { assertNotProjectViewer } from "@/lib/permissions";
 
-export type SprintActionState = { error?: string; sprintId?: string } | undefined;
+export type SprintActionState =
+  | { error?: string; sprintId?: string }
+  | undefined;
 
 export async function createSprint(
   state: SprintActionState,
@@ -28,7 +31,8 @@ export async function createSprint(
   const endDate = formData.get("end_date")?.toString() || null;
   if (!endDate) return { error: "End date is required" };
 
-  if (endDate < startDate) return { error: "End date must be after start date" };
+  if (endDate < startDate)
+    return { error: "End date must be after start date" };
 
   const project = await db
     .selectFrom("projects")
@@ -36,6 +40,9 @@ export async function createSprint(
     .select(["organization_id"])
     .executeTakeFirst();
   if (!project) return { error: "Project not found" };
+
+  const viewerErr = await assertNotProjectViewer(projectId, session.user.id);
+  if (viewerErr) return viewerErr;
 
   const sprintId = randomUUID();
   const now = new Date().toISOString();
@@ -68,7 +75,12 @@ export async function createSprint(
         sprint_id: sprintId,
         user_id: session.user.id,
         type: "sprint_created",
-        payload: JSON.stringify({ name, goal, start_date: startDate, end_date: endDate }),
+        payload: JSON.stringify({
+          name,
+          goal,
+          start_date: startDate,
+          end_date: endDate,
+        }),
         created_at: new Date().toISOString(),
       })
       .execute();
@@ -89,7 +101,15 @@ export async function startSprint(
     .select(["project_id", "organization_id", "status", "name"])
     .executeTakeFirst();
   if (!sprint) return { error: "Sprint not found" };
-  if (sprint.status !== "planned") return { error: "Sprint is not in planned status" };
+
+  const viewerErr = await assertNotProjectViewer(
+    sprint.project_id,
+    session.user.id,
+  );
+  if (viewerErr) return viewerErr;
+
+  if (sprint.status !== "planned")
+    return { error: "Sprint is not in planned status" };
 
   const existingActive = await db
     .selectFrom("sprints")
@@ -97,7 +117,11 @@ export async function startSprint(
     .where("status", "=", "active")
     .select(["id"])
     .executeTakeFirst();
-  if (existingActive) return { error: "A sprint is already active. Complete it before starting a new one." };
+  if (existingActive)
+    return {
+      error:
+        "A sprint is already active. Complete it before starting a new one.",
+    };
 
   const now = new Date().toISOString();
   await db
@@ -141,10 +165,18 @@ export async function completeSprint(
     .select(["project_id", "organization_id", "status", "name"])
     .executeTakeFirst();
   if (!sprint) return { error: "Sprint not found" };
+
+  const viewerErr = await assertNotProjectViewer(
+    sprint.project_id,
+    session.user.id,
+  );
+  if (viewerErr) return viewerErr;
+
   if (sprint.status !== "active") return { error: "Sprint is not active" };
 
   const now = new Date().toISOString();
-  const targetSprintId: string | null = moveTarget === "backlog" ? null : moveTarget;
+  const targetSprintId: string | null =
+    moveTarget === "backlog" ? null : moveTarget;
 
   const incompleteIssues = await db
     .selectFrom("issues")
@@ -218,6 +250,12 @@ export async function moveIssueToSprint(
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
 
+  const viewerErr = await assertNotProjectViewer(
+    issue.project_id,
+    session.user.id,
+  );
+  if (viewerErr) return viewerErr;
+
   const sprint = await db
     .selectFrom("sprints")
     .where("id", "=", sprintId)
@@ -265,9 +303,21 @@ export async function removeIssueFromSprint(
   const issue = await db
     .selectFrom("issues")
     .where("id", "=", issueId)
-    .select(["project_id", "organization_id", "sprint_id", "issue_number", "title"])
+    .select([
+      "project_id",
+      "organization_id",
+      "sprint_id",
+      "issue_number",
+      "title",
+    ])
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
+
+  const viewerErr = await assertNotProjectViewer(
+    issue.project_id,
+    session.user.id,
+  );
+  if (viewerErr) return viewerErr;
 
   let sprintWasActive = false;
   if (issue.sprint_id) {
@@ -340,28 +390,56 @@ export async function updateSprint(
     .executeTakeFirst();
 
   if (!sprint) return { error: "Sprint not found" };
-  if (sprint.status === "completed") return { error: "Completed sprints cannot be edited" };
+
+  const viewerErr = await assertNotProjectViewer(
+    sprint.project_id,
+    session.user.id,
+  );
+  if (viewerErr) return viewerErr;
+
+  if (sprint.status === "completed")
+    return { error: "Completed sprints cannot be edited" };
 
   const now = new Date().toISOString();
 
   if (sprint.status === "planned") {
-    const changes: { field: string; from: string | null; to: string | null }[] = [];
+    const changes: { field: string; from: string | null; to: string | null }[] =
+      [];
 
     if (data.name !== undefined && sprint.name !== data.name)
       changes.push({ field: "name", from: sprint.name, to: data.name ?? null });
-    if (data.goal !== undefined && (sprint.goal ?? null) !== (data.goal ?? null))
+    if (
+      data.goal !== undefined &&
+      (sprint.goal ?? null) !== (data.goal ?? null)
+    )
       changes.push({ field: "goal", from: sprint.goal, to: data.goal ?? null });
-    if (data.start_date !== undefined && (sprint.start_date ?? null) !== (data.start_date ?? null))
-      changes.push({ field: "start_date", from: sprint.start_date, to: data.start_date ?? null });
-    if (data.end_date !== undefined && (sprint.end_date ?? null) !== (data.end_date ?? null))
-      changes.push({ field: "end_date", from: sprint.end_date, to: data.end_date ?? null });
+    if (
+      data.start_date !== undefined &&
+      (sprint.start_date ?? null) !== (data.start_date ?? null)
+    )
+      changes.push({
+        field: "start_date",
+        from: sprint.start_date,
+        to: data.start_date ?? null,
+      });
+    if (
+      data.end_date !== undefined &&
+      (sprint.end_date ?? null) !== (data.end_date ?? null)
+    )
+      changes.push({
+        field: "end_date",
+        from: sprint.end_date,
+        to: data.end_date ?? null,
+      });
 
     await db
       .updateTable("sprints")
       .set({
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.goal !== undefined ? { goal: data.goal } : {}),
-        ...(data.start_date !== undefined ? { start_date: data.start_date } : {}),
+        ...(data.start_date !== undefined
+          ? { start_date: data.start_date }
+          : {}),
         ...(data.end_date !== undefined ? { end_date: data.end_date } : {}),
         updated_at: now,
       })
@@ -387,14 +465,25 @@ export async function updateSprint(
       });
     }
   } else if (sprint.status === "active") {
-    const changes: { field: string; from: string | null; to: string | null }[] = [];
+    const changes: { field: string; from: string | null; to: string | null }[] =
+      [];
 
     if (data.name !== undefined && sprint.name !== data.name)
       changes.push({ field: "name", from: sprint.name, to: data.name ?? null });
-    if (data.goal !== undefined && (sprint.goal ?? null) !== (data.goal ?? null))
+    if (
+      data.goal !== undefined &&
+      (sprint.goal ?? null) !== (data.goal ?? null)
+    )
       changes.push({ field: "goal", from: sprint.goal, to: data.goal ?? null });
-    if (data.end_date !== undefined && (sprint.end_date ?? null) !== (data.end_date ?? null))
-      changes.push({ field: "end_date", from: sprint.end_date, to: data.end_date ?? null });
+    if (
+      data.end_date !== undefined &&
+      (sprint.end_date ?? null) !== (data.end_date ?? null)
+    )
+      changes.push({
+        field: "end_date",
+        from: sprint.end_date,
+        to: data.end_date ?? null,
+      });
 
     await db
       .updateTable("sprints")

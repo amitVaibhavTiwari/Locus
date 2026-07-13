@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Save, Archive, ArchiveRestore } from "lucide-react";
+import { Save, Archive, ArchiveRestore, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateProject, archiveProject } from "@/actions/projects";
 
@@ -43,7 +43,8 @@ export function ProjectSettingsClient({
 }: ProjectSettingsClientProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [isArchiving, startArchiveTransition] = useTransition();
 
   const [projectName, setProjectName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
@@ -57,7 +58,21 @@ export function ProjectSettingsClient({
     archiveConfirmText.trim().toLowerCase() ===
     expectedArchiveText.toLowerCase();
 
+  const isDirty =
+    projectName.trim() !== project.name ||
+    description !== (project.description ?? "") ||
+    visibility !== project.visibility;
+
   const handleSave = () => {
+    if (!projectName.trim()) {
+      toast({
+        title: "Error",
+        description: "Project name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const formData = new FormData();
     formData.set("project_id", project.id);
     formData.set("name", projectName.trim());
@@ -83,7 +98,7 @@ export function ProjectSettingsClient({
 
   const handleArchive = () => {
     if (!canConfirmArchive) return;
-    startTransition(async () => {
+    startArchiveTransition(async () => {
       const result = await archiveProject(project.id);
       if (result.error) {
         toast({
@@ -103,7 +118,7 @@ export function ProjectSettingsClient({
   };
 
   const handleRestore = () => {
-    startTransition(async () => {
+    startArchiveTransition(async () => {
       const result = await archiveProject(project.id);
       if (result.error) {
         toast({
@@ -124,148 +139,188 @@ export function ProjectSettingsClient({
   return (
     <div className="p-6 space-y-10">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-1">
-          Project Settings
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Manage how this project appears and behaves for your team
+        <h1 className="text-4xl font-bold">Project Settings</h1>
+        <p className="text-base text-muted-foreground mt-1">
+          Manage this project&apos;s details and preferences.
         </p>
       </div>
 
-      <section className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="project-name">Project name</Label>
-          <Input
-            id="project-name"
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            className="max-w-lg"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Input
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="visibility">Visibility</Label>
-          <Select value={visibility} onValueChange={setVisibility}>
-            <SelectTrigger id="visibility" className="max-w-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="private">Private</SelectItem>
-              <SelectItem value="public">Public</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex justify-end">
-          <Button onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
-            Save Changes
-          </Button>
-        </div>
-      </section>
-
-      {userRole === "owner" && (
-        <section className="space-y-6">
+      <div className="space-y-4">
+        <section className="rounded-lg bg-muted/40 px-5 py-5 space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-destructive">
-              Danger Zone
-            </h2>
-            {/* <p className="text-xs text-muted-foreground mt-0.5">
-              These actions are hard to undo. Be careful.
-            </p> */}
+            <h2 className="text-base font-semibold">General</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Basic project information.
+            </p>
           </div>
-
-          <div className="flex items-center justify-between gap-6">
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {project.archived ? "Restore project" : "Archive project"}
-              </p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {project.archived
-                  ? "Make this project active and visible to the team again."
-                  : "Hide this project from the projects list. It can be restored later."}
-              </p>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="project-name">Project name</Label>
+              <Input
+                id="project-name"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="Enter project name"
+              />
             </div>
-            {project.archived ? (
-              <Button variant="outline" size="sm" onClick={handleRestore}>
-                <ArchiveRestore className="w-4 h-4 mr-2" />
-                Restore
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
-                onClick={() => {
-                  setArchiveConfirmText("");
-                  setArchiveDialogOpen(true);
-                }}
-              >
-                <Archive className="w-4 h-4 mr-2" />
-                Archive
-              </Button>
-            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="description">
+                Description{" "}
+                <span className="text-muted-foreground font-normal">
+                  (optional)
+                </span>
+              </Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What is this project about?"
+                className="resize-none"
+                rows={3}
+              />
+            </div>
           </div>
         </section>
-      )}
+
+        <section className="rounded-lg bg-muted/40 px-5 py-5 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Visibility</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Control who can see this project.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Select value={visibility} onValueChange={setVisibility}>
+              <SelectTrigger id="visibility" className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">Private</SelectItem>
+                <SelectItem value="public">Public</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              {visibility === "private"
+                ? "Only members added to this project can see it."
+                : "All workspace members can see this project."}
+            </p>
+          </div>
+        </section>
+
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={isPending} className="gap-2">
+            {isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            Save changes
+          </Button>
+        </div>
+
+        {userRole === "owner" && (
+          <section className="rounded-lg bg-muted/40 px-5 py-5 space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-destructive">
+                Danger Zone
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Irreversible or impactful actions.
+              </p>
+            </div>
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <p className="text-sm font-medium">
+                  {project.archived ? "Restore project" : "Archive project"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {project.archived
+                    ? "Make this project active and visible to the team again."
+                    : "Hide this project from the projects list. It can be restored later."}
+                </p>
+              </div>
+              {project.archived ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRestore}
+                  disabled={isArchiving}
+                  className="shrink-0 gap-2"
+                >
+                  {isArchiving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ArchiveRestore className="w-4 h-4" />
+                  )}
+                  Restore
+                </Button>
+              ) : (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="shrink-0 gap-2"
+                  onClick={() => {
+                    setArchiveConfirmText("");
+                    setArchiveDialogOpen(true);
+                  }}
+                >
+                  <Archive className="w-4 h-4" />
+                  Archive
+                </Button>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
 
       <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader className="text-center items-center gap-1">
-            <DialogTitle className="text-xl font-semibold">
-              Archive this project?
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              <span className="font-semibold"> {project.name}</span> will be
-              hidden from the projects list but can be restored later.
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Archive this project?</DialogTitle>
+            <DialogDescription>
+              <span className="font-medium text-foreground">
+                {project.name}
+              </span>{" "}
+              will be hidden from the projects list but can be restored later.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-1.5 mt-4">
-            <Label
-              htmlFor="archive-confirm"
-              className="text-center font font-semibold block"
-            >
-              Type below text to confirm
+          <div className="space-y-2 py-2">
+            <Label htmlFor="archive-confirm">
+              Type{" "}
+              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                archive {project.name}
+              </span>{" "}
+              to confirm
             </Label>
-            <p className=" text-sm text-center text-foreground/70 tracking-wide select-none">
-              Archive {project.name}
-            </p>
             <Input
               id="archive-confirm"
               value={archiveConfirmText}
               onChange={(e) => setArchiveConfirmText(e.target.value)}
-              // placeholder={`archive ${project.name}`}
               autoComplete="off"
-              className="text-center"
               onKeyDown={(e) => e.key === "Enter" && handleArchive()}
             />
           </div>
 
-          <DialogFooter className="flex-row gap-2">
+          <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              className="flex-1"
               onClick={() => setArchiveDialogOpen(false)}
             >
               Cancel
             </Button>
             <Button
-              className="flex-1"
-              disabled={!canConfirmArchive}
+              variant="destructive"
+              disabled={!canConfirmArchive || isArchiving}
               onClick={handleArchive}
+              className="gap-2"
             >
-              <Archive className="w-4 h-4 mr-2" />
-              Archive
+              {isArchiving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Archive className="w-4 h-4" />
+              )}
+              Archive project
             </Button>
           </DialogFooter>
         </DialogContent>

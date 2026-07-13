@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getSessionUser, getActiveOrg, getEpic } from "@/lib/dal";
+import { getUserIdFromRequest, getOrgIdFromRequest, getEpic } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { EpicHistoryClient } from "./EpicHistoryClient";
 
@@ -10,8 +10,11 @@ export default async function EpicHistoryPage({
 }) {
   const { epicId } = await params;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const epic = await getEpic(epicId);
   if (!epic) notFound();

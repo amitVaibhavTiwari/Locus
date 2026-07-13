@@ -1,8 +1,35 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+
+// This reads current user's id from the x-user-id header (set by proxy from JWT). Thus preventing unnecessary DB calls in server components.
+export async function getUserIdFromRequest(): Promise<string | null> {
+  const h = await headers();
+  return h.get("x-user-id");
+}
+
+// This reads currently active organization id for the user from the x-org-id header (set by proxy from cookie). If the cookie hasn't been set yet, it falls back to DB query to fetch the active organization id for the user. This is used in server components to avoid unnecessary DB calls.
+export async function getOrgIdFromRequest(): Promise<string | null> {
+  const h = await headers();
+  const fromHeader = h.get("x-org-id");
+  if (fromHeader) return fromHeader;
+
+  const userId = h.get("x-user-id");
+  if (!userId) return null;
+  return getActiveOrgId(userId);
+}
+
+export const getActiveOrgId = cache(async (userId: string) => {
+  const prefs = await db
+    .selectFrom("user_preferences")
+    .where("user_id", "=", userId)
+    .select(["active_organization_id"])
+    .executeTakeFirst();
+  return prefs?.active_organization_id ?? null;
+});
 
 export const verifySession = cache(async () => {
   const session = await auth();
@@ -10,82 +37,13 @@ export const verifySession = cache(async () => {
   return session;
 });
 
-export const getSessionUser = cache(async () => {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-
-  return db
-    .selectFrom("users")
-    .where("id", "=", session.user.id)
-    .select(["id", "email", "username", "avatar_url"])
-    .executeTakeFirst()
-    .then((u) => u ?? null);
-});
-
-export const getActiveOrg = cache(async () => {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-
-  const prefs = await db
-    .selectFrom("user_preferences")
-    .where("user_id", "=", session.user.id)
-    .select(["active_organization_id"])
-    .executeTakeFirst();
-
-  if (!prefs?.active_organization_id) return null;
-
-  const [org, workspacePrefs] = await Promise.all([
-    db
-      .selectFrom("organizations")
-      .where("id", "=", prefs.active_organization_id)
-      .select([
-        "id",
-        "name",
-        "slug",
-        "logo_url",
-        "created_by",
-        "created_at",
-        "updated_at",
-      ])
-      .executeTakeFirst(),
-    db
-      .selectFrom("workspace_preferences")
-      .where("organization_id", "=", prefs.active_organization_id)
-      .select([
-        "id",
-        "organization_id",
-        "display_name",
-        "brand_color",
-        "logo_url",
-        "allow_admin_invite",
-        "updated_at",
-      ])
-      .executeTakeFirst(),
-  ]);
-
-  if (!org) return null;
-  return { ...org, workspacePrefs: workspacePrefs ?? null };
-});
-
-export const getCurrentUserOrgRole = cache(async () => {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-
-  const prefs = await db
-    .selectFrom("user_preferences")
-    .where("user_id", "=", session.user.id)
-    .select(["active_organization_id"])
-    .executeTakeFirst();
-
-  if (!prefs?.active_organization_id) return null;
-
+export const getOrgMemberRole = cache(async (userId: string, orgId: string) => {
   const member = await db
     .selectFrom("organization_members")
-    .where("organization_id", "=", prefs.active_organization_id)
-    .where("user_id", "=", session.user.id)
+    .where("organization_id", "=", orgId)
+    .where("user_id", "=", userId)
     .select(["role"])
     .executeTakeFirst();
-
   return member?.role ?? null;
 });
 
@@ -804,10 +762,16 @@ export const getMyAssignedIssues = cache(
   },
 );
 
-export const getUserWorkspaces = cache(async () => {
-  const session = await auth();
-  if (!session?.user?.id) return [];
+export const getUserById = cache(async (userId: string) => {
+  return db
+    .selectFrom("users")
+    .where("id", "=", userId)
+    .select(["id", "email", "username", "avatar_url"])
+    .executeTakeFirst()
+    .then((u) => u ?? null);
+});
 
+export const getUserWorkspaces = cache(async (userId: string) => {
   const rows = await db
     .selectFrom("organization_members")
     .innerJoin(
@@ -820,7 +784,7 @@ export const getUserWorkspaces = cache(async () => {
       "workspace_preferences.organization_id",
       "organizations.id",
     )
-    .where("organization_members.user_id", "=", session.user.id)
+    .where("organization_members.user_id", "=", userId)
     .select([
       "organizations.id",
       "organizations.name",

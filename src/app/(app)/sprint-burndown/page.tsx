@@ -1,14 +1,19 @@
 ﻿import { redirect } from "next/navigation";
-import { getActiveOrg, getOrgSprintSummaries } from "@/lib/dal";
+import {
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
+  getOrgSprintSummaries,
+} from "@/lib/dal";
 import { SprintBurndownClient } from "./SprintBurndownClient";
 
 export default async function SprintBurndown() {
-  const org = await getActiveOrg();
-  if (!org) redirect("/login");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
 
-  const { activeSprint, completedSprints } = await getOrgSprintSummaries(
-    org.id,
-  );
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
+
+  const { activeSprint, completedSprints } = await getOrgSprintSummaries(orgId);
 
   return (
     <SprintBurndownClient

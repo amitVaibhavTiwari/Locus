@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import {
-  getActiveOrg,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
   getMyAssignedIssues,
   getMyAssignedProjectNames,
-  getSessionUser,
 } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
@@ -16,27 +16,31 @@ export default async function DashboardPage({
   searchParams: Promise<{ q?: string; project?: string; sort?: string }>;
 }) {
   const params = await searchParams;
-  const [org, user] = await Promise.all([getActiveOrg(), getSessionUser()]);
-  if (!org || !user) redirect("/login");
+
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const search = params.q?.trim() || undefined;
   const project = params.project || undefined;
   const sort = params.sort || undefined;
 
   const [tasks, projects, rawNotes, rawLinks] = await Promise.all([
-    getMyAssignedIssues(org.id, user.id, search, project, sort),
-    getMyAssignedProjectNames(org.id, user.id),
+    getMyAssignedIssues(orgId, userId, search, project, sort),
+    getMyAssignedProjectNames(orgId, userId),
     db
       .selectFrom("notes")
-      .where("user_id", "=", user.id)
-      .where("organization_id", "=", org.id)
+      .where("user_id", "=", userId)
+      .where("organization_id", "=", orgId)
       .selectAll()
       .orderBy("rank", "asc")
       .execute(),
     db
       .selectFrom("links")
-      .where("user_id", "=", user.id)
-      .where("organization_id", "=", org.id)
+      .where("user_id", "=", userId)
+      .where("organization_id", "=", orgId)
       .selectAll()
       .orderBy("rank", "asc")
       .execute(),
@@ -91,7 +95,6 @@ export default async function DashboardPage({
     <Suspense>
       <DashboardOverview
         tasks={tasks}
-        username={user.username}
         initialNotes={notes}
         initialLinks={links}
         projects={projects}

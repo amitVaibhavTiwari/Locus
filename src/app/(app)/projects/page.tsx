@@ -1,9 +1,8 @@
 ﻿import { redirect } from "next/navigation";
 import {
-  getSessionUser,
-  getActiveOrg,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
   getPinnedProjects,
-  getCurrentUserOrgRole,
 } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { ProjectsClient } from "./ProjectsClient";
@@ -11,16 +10,15 @@ import { ProjectsClient } from "./ProjectsClient";
 const PAGE_SIZE = 15;
 
 export default async function ProjectsPage() {
-  const [user, org, userRole] = await Promise.all([
-    getSessionUser(),
-    getActiveOrg(),
-    getCurrentUserOrgRole(),
-  ]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const projectsBaseQuery = db
     .selectFrom("projects")
-    .where("organization_id", "=", org.id)
+    .where("organization_id", "=", orgId)
     .where("archived", "=", 0)
     .where((eb) =>
       eb.or([
@@ -29,7 +27,7 @@ export default async function ProjectsPage() {
           eb
             .selectFrom("project_members")
             .whereRef("project_members.project_id", "=", "projects.id")
-            .where("project_members.user_id", "=", user.id)
+            .where("project_members.user_id", "=", userId)
             .select("project_members.id"),
         ),
       ]),
@@ -51,7 +49,7 @@ export default async function ProjectsPage() {
     projectsBaseQuery
       .select((eb) => eb.fn.countAll<number>().as("total"))
       .executeTakeFirst(),
-    getPinnedProjects(user.id, org.id),
+    getPinnedProjects(userId, orgId),
   ]);
 
   const hasMore = firstBatch.length > PAGE_SIZE;
@@ -65,7 +63,6 @@ export default async function ProjectsPage() {
       initialHasMore={hasMore}
       initialTotal={initialTotal}
       pinnedIds={pinnedIds}
-      userRole={userRole ?? "member"}
     />
   );
 }

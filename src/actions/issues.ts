@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { db } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 import { notify } from "@/lib/notifications";
+import { assertNotProjectViewer } from "@/lib/permissions";
 
 const LABEL_COLORS = [
   "#3b82f6",
@@ -120,6 +121,9 @@ export async function createIssue(
     .executeTakeFirst();
   if (!project) return { error: "Project not found" };
 
+  const viewerErr = await assertNotProjectViewer(projectId, session.user.id);
+  if (viewerErr) return viewerErr;
+
   const board = await getProjectBoard(projectId);
   if (!board) return { error: "No board found for this project" };
 
@@ -220,6 +224,12 @@ export async function moveIssue(
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
 
+  const viewerErr = await assertNotProjectViewer(
+    issue.project_id,
+    session.user.id,
+  );
+  if (viewerErr) return viewerErr;
+
   const columnId = issue.board_id
     ? await getColumnIdForStatus(issue.board_id, newStatus)
     : null;
@@ -318,6 +328,12 @@ export async function updateIssue(
     ])
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
+
+  const viewerErr = await assertNotProjectViewer(
+    issue.project_id,
+    session.user.id,
+  );
+  if (viewerErr) return viewerErr;
 
   if (
     issue.edit_permission === "assignee_only" &&
@@ -545,7 +561,7 @@ export async function updateIssue(
 export async function deleteIssue(
   issueId: string,
 ): Promise<{ error?: string }> {
-  await verifySession();
+  const session = await verifySession();
 
   const issue = await db
     .selectFrom("issues")
@@ -553,6 +569,12 @@ export async function deleteIssue(
     .select(["project_id"])
     .executeTakeFirst();
   if (!issue) return { error: "Issue not found" };
+
+  const viewerErr = await assertNotProjectViewer(
+    issue.project_id,
+    session.user.id,
+  );
+  if (viewerErr) return viewerErr;
 
   await db.deleteFrom("issues").where("id", "=", issueId).execute();
 

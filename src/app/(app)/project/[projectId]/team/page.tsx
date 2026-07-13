@@ -1,5 +1,10 @@
 import { notFound, redirect } from "next/navigation";
-import { getSessionUser, getActiveOrg, getProject, getOrgMembers } from "@/lib/dal";
+import {
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
+  getProject,
+  getOrgMembers,
+} from "@/lib/dal";
 import { db } from "@/lib/db";
 import { ProjectTeamClient } from "./ProjectTeamClient";
 
@@ -12,17 +17,19 @@ export default async function ProjectTeamPage({
 }) {
   const { projectId } = await params;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const [project, orgMembers] = await Promise.all([
-    getProject(projectId, org.id, user.id),
-    getOrgMembers(org.id),
+    getProject(projectId, orgId, userId),
+    getOrgMembers(orgId),
   ]);
 
   if (!project) notFound();
 
-  // First page of project members
   const membersBaseQuery = db
     .selectFrom("project_members")
     .innerJoin("users", "users.id", "project_members.user_id")
@@ -69,7 +76,6 @@ export default async function ProjectTeamPage({
       initialHasMore={hasMore}
       initialTotal={initialTotal}
       availableMembers={availableMembers}
-      currentUserId={user.id}
     />
   );
 }

@@ -137,7 +137,7 @@ export function NotificationWidget() {
   return (
     <div
       ref={panelRef}
-      className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3"
+      className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3 pointer-events-none"
     >
       <div
         className={`w-[380px] bg-card border border-border rounded-lg shadow-2xl overflow-hidden transition-all duration-300 ease-out origin-bottom-right ${
@@ -249,7 +249,7 @@ export function NotificationWidget() {
 
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className="relative w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center"
+        className="relative w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center pointer-events-auto"
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5" />

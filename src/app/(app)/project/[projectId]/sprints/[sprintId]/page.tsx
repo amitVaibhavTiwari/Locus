@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import {
-  getSessionUser,
-  getActiveOrg,
+  getUserIdFromRequest,
+  getOrgIdFromRequest,
   getProject,
   getProjectSprints,
   getSprintIssues,
@@ -15,11 +15,14 @@ export default async function SprintDetailPage({
 }) {
   const { projectId, sprintId } = await params;
 
-  const [user, org] = await Promise.all([getSessionUser(), getActiveOrg()]);
-  if (!org || !user) redirect("/onboarding/workspace");
+  const userId = await getUserIdFromRequest();
+  if (!userId) redirect("/login");
+
+  const orgId = await getOrgIdFromRequest();
+  if (!orgId) redirect("/onboarding/workspace");
 
   const [project, allSprints, issues] = await Promise.all([
-    getProject(projectId, org.id, user.id),
+    getProject(projectId, orgId, userId),
     getProjectSprints(projectId),
     getSprintIssues(sprintId),
   ]);
