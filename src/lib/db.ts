@@ -15,6 +15,24 @@ function createDb(): Kysely<Database> {
     });
   }
 
+  if (url.startsWith("libsql://") || url.startsWith("wss://")) {
+    // Turso
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createClient } =
+      require("@libsql/client") as typeof import("@libsql/client");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { LibsqlDialect } =
+      require("kysely-libsql") as typeof import("kysely-libsql");
+    const authToken = process.env.TURSO_AUTH_TOKEN;
+    if (!authToken) throw new Error("TURSO_AUTH_TOKEN is not set");
+    return new Kysely<Database>({
+      dialect: new LibsqlDialect({
+        client: createClient({ url, authToken }),
+      }),
+    });
+  }
+
+  //  SQLite file
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
   const BetterSqlite3 = require("better-sqlite3") as {
     new (filename: string): any;
@@ -31,6 +49,6 @@ declare global {
   var __db: Kysely<Database> | undefined;
 }
 
-// Singleton — reuse connection pool across hot reloads in dev
+// Singleton to reuse connection pool across hot reloads in dev
 export const db: Kysely<Database> =
   globalThis.__db ?? (globalThis.__db = createDb());
